@@ -1,0 +1,426 @@
+#!/usr/bin/env ruby
+
+require 'time'
+require 'omf_common'
+require 'optparse'
+
+@config = YAML.load_file('../etc/configuration.yaml')
+@auth = @config[:auth]
+@xmpp = @config[:xmpp]
+
+options = {}
+opt_parser = OptionParser.new do |opts|
+  opts.banner = "Usage: omf6 [COMMAND] [OPTIONS]"
+  opts.separator ""
+  opts.separator "Commands"
+  opts.separator  "     load : load an image to a group of nodes"
+  opts.separator  "     save : reate an image from a node"
+  opts.separator  "     tell : change the status of a group of nodes (status can be on/off/reset)"
+  opts.separator  "     stat : report the status of a group of nodes"
+  opts.separator "Options"
+
+  opts.on('-i', '--image IMAGE_NAME', 'the image name for save command') { |v| options[:image] = v }
+  opts.on('-n', '--node NODE', 'node name for save command') { |v| options[:node] = v }
+  opts.on('-a', '--status STATUS', 'the status you want to get the node to. Required only on tell command.') { |v| options[:status] = v }
+  opts.on('-t', '--target_nodes NODES', 'target nodes you want to run the command too. Required on commands load, tell and stat.') {|v| options[:target_nodes] = v.split(",") }
+
+  options[:last_action] = "reset" #actions are reset and shutdown
+  opts.on('-l', '--last_action ACTION', "action you want to perform after the commands is executed. Optional on commands load and save (last_action can be reset/shutdown. Default #{options[:last_action]})."){|v| options[:last_action] = v}
+end
+
+#run frisbee server
+def create_frisbeed(comm, fcontroller, port, options)
+  fcontroller.create(:frisbeed, hrn: 'frisbee server', image: options[:image], port: port) do |reply_msg|
+    #image "/var/lib/omf-images-5.4/baseline.ndz"
+    if reply_msg.success?
+      server = reply_msg.resource
+      server.on_subscribed do
+        server.on_message do |m|
+          if m.operation == :inform
+            if m.read_content("event") == "STDOUT"
+              puts m.read_content("msg")
+            elsif m.read_content("event") == "EXIT"
+              puts m.read_content("msg")
+            end
+          end
+        end
+      end
+    else
+      error ">>> Frisbeed resource creation failed - #{reply_msg[:reason]}"
+    end
+  end
+end
+
+#run frisbee client on a node
+def create_frisbee(comm, fcontroller, node, port, options)
+  fcontroller.create(:frisbee, hrn: 'frisbee client', port: port, node_topic: "#{node.to_s}") do |reply_msg|
+    if reply_msg.success?
+      client = reply_msg.resource
+      client.on_subscribed do
+        client.on_message do |m|
+          if m.operation == :inform
+            if m.read_property("event") == "STARTED"#only happens when frisbee runs with :application rc
+#               @nof_nodes_up_frisbee += 1
+#               if @nof_nodes == @nof_nodes_up_frisbee
+#                 create_frisbeed(fcontroller, port) #frisbee server
+#                 puts "load operation started."
+#               end
+            elsif m.read_property("event") == "STDOUT"
+              puts "#{m.read_property("node")}: #{m.read_property("msg")}"
+            elsif m.read_property("event") == "EXIT"
+              puts "#{m.read_property("node")}: #{m.read_property("msg")}"
+              comm.subscribe('cm_factory') do |controller|
+                controller.on_message do |msg|
+                  if msg.operation == :inform
+                    case msg.read_content("itype")
+                    when 'STATUS'
+                      if msg.read_property("event_type") == "PXE_OFF"
+                        puts "#{options[:last_action]} node '#{msg.read_property("node")}' out of PXE."
+                        @nof_nodes_up_without_pxe += 1
+                        if @nof_nodes == @nof_nodes_up_without_pxe
+                          puts "load proccess completed."
+                          comm.disconnect
+                        end
+                      end
+                    when 'ERROR'
+                      error msg.read_content('reason') if m.read_content("itype") == 'ERROR'
+                    when 'WARN'
+                      warn msg.read_content('reason') if m.read_content("itype") == 'WARN'
+                    end
+                  end
+                end
+                puts "#{options[:last_action]} node '#{m.read_property("node")}' out of PXE."
+                controller.configure(state: {node: node.to_sym, status: :start_without_pxe, last_action: options[:last_action]})
+              end
+            end
+          end
+        end
+      end
+    else
+      error ">>> Frisbee resource creation failed - #{reply_msg[:reason]}"
+    end
+  end
+end
+
+def load(comm, options)
+  comm.subscribe('cm_factory') do |controller|
+    #TODO handle the case some nodes are not up and running
+    unless controller.error?
+      @nof_nodes = options[:target_nodes].length
+      @nof_nodes_up_frisbee = 0
+      @nof_nodes_up_without_pxe = 0
+      nof_nodes_up_pxe = 0
+      port = nil
+      controller.on_message do |m|
+        if m.operation == :inform && m.read_property("event_type") == "PXE"
+          case m.read_content("itype")
+          when 'STATUS'
+            logger.info "#{m.read_property("msg")}, exit code: #{m.read_property("exit_code")}"
+            if m.read_property("exit_code") == 0
+              nof_nodes_up_pxe += 1
+              if @nof_nodes == nof_nodes_up_pxe #all nodes are up and running on pxe
+                puts "all nodes are up and running on pxe."
+                comm.subscribe('frisbee_factory') do |fcontroller|
+                  puts "requesting available port"
+                  fcontroller.request([:ports]) do |m|
+                    port = m.read_property("ports")
+                    puts "running frisbee server on port '#{port}'"
+                    create_frisbeed(comm, fcontroller, port, options)
+                    options[:target_nodes].each do |node|
+                      create_frisbee(comm, fcontroller, node, port, options) #frisbee client
+                    end
+                    puts "running frisbee client on specified nodes."
+                  end
+                end
+              end
+            else
+              error "exit code: #{m.read_content('exit_code')}"
+            end
+          when 'ERROR'
+            error m.read_content('reason') if m.read_content("itype") == 'ERROR'
+          when 'WARN'
+            warn m.read_content('reason') if m.read_content("itype") == 'WARN'
+          end
+        end
+      end
+      options[:target_nodes].each do |node|
+        controller.configure(state: {node: node.to_sym, status: :start_on_pxe})
+      end
+      puts "waiting for target nodes to boot on PXE."
+    else
+      error controller.inspect
+    end
+  end
+end
+
+#run imagezip server
+def create_imagezip_server(comm, fcontroller, port, options)
+  fcontroller.create(:imagezip_server, hrn: 'imagezip server', image: options[:image], port: port) do |reply_msg|
+    #image "/var/lib/omf-images-5.4/baseline.ndz"
+    if reply_msg.success?
+      server = reply_msg.resource
+      server.on_subscribed do
+        server.on_message do |m|
+          if m.operation == :inform
+            if m.read_content("event") == "STDOUT"
+              puts m.read_content("msg")
+            elsif m.read_content("event") == "EXIT"
+              puts m.read_content("msg")
+            end
+          end
+        end
+      end
+    else
+      error ">>> Imagezip Server resource creation failed - #{reply_msg[:reason]}"
+    end
+  end
+end
+
+#run imagezip client on a node
+def create_imagezip_client(comm, fcontroller, node, port, options)
+  fcontroller.create(:imagezip_client, hrn: 'imagezip client', port: port, node_topic: "#{node.to_s}") do |reply_msg|
+    if reply_msg.success?
+      client = reply_msg.resource
+      client.on_subscribed do
+        client.on_message do |m|
+          if m.operation == :inform
+            if m.read_property("event") == "STDOUT"
+              print "#{m.read_property("msg")}"
+            elsif m.read_property("event") == "EXIT"
+              puts "#{m.read_property("node")}: #{m.read_property("msg")}"
+              comm.subscribe('cm_factory') do |controller|
+                controller.on_message do |msg|
+                  if msg.operation == :inform
+                    case msg.read_content("itype")
+                    when 'STATUS'
+                      if msg.read_property("event_type") == "PXE_OFF"
+                        puts "save proccess completed. Image was saved on file '/tmp/image.ndz'"
+                        comm.disconnect
+                      end
+                    when 'ERROR'
+                      error msg.read_content('reason') if m.read_content("itype") == 'ERROR'
+                    when 'WARN'
+                      warn msg.read_content('reason') if m.read_content("itype") == 'WARN'
+                    end
+                  end
+                end
+                puts "#{options[:last_action]} node '#{m.read_property("node")}' out of PXE."
+                controller.configure(state: {node: node.to_sym, status: :start_without_pxe, last_action: options[:last_action]})
+              end
+            end
+          end
+        end
+      end
+    else
+      error ">>> Frisbee resource creation failed - #{reply_msg[:reason]}"
+    end
+  end
+end
+
+def save(comm, options)
+  comm.subscribe('cm_factory') do |controller|
+    #TODO handle the case some nodes are not up and running
+    unless controller.error?
+      port = nil
+      controller.on_message do |m|
+        if m.operation == :inform && m.read_property("event_type") == "PXE"
+          case m.read_content("itype")
+          when 'STATUS'
+            logger.info "#{m.read_property("msg")}, exit code: #{m.read_property("exit_code")}"
+            if m.read_property("exit_code") == 0
+              puts "node is up and running on pxe."
+              comm.subscribe('frisbee_factory') do |fcontroller|
+                puts "requesting available port"
+                fcontroller.request([:ports]) do |m|
+                  port = m.read_property("ports")
+                  puts "running imagezip server on port #{port}."
+                  create_imagezip_server(comm, fcontroller, port, options)
+                  sleep 2
+                  puts "running imagezip client on node."
+                  create_imagezip_client(comm, fcontroller, options[:node], port, options)
+                end
+              end
+            else
+              error "exit code: #{m.read_content('exit_code')}"
+            end
+          when 'ERROR'
+            error m.read_content('reason') if m.read_content("itype") == 'ERROR'
+          when 'WARN'
+            warn m.read_content('reason') if m.read_content("itype") == 'WARN'
+          end
+        end
+      end
+
+      controller.configure(state: {node: options[:node].to_sym, status: :start_on_pxe})
+      puts "waiting for node to boot on PXE."
+    else
+      error controller.inspect
+    end
+  end
+end
+
+def tell(comm, options)
+  comm.subscribe('cm_factory') do |controller|
+    unless controller.error?
+      nof_nodes = 0
+      controller.on_message do |m|
+        if m.operation == :inform
+          case m.read_content("itype")
+          when 'STATUS'
+            if m.read_property("event_type") == "STOP_NODE" ||  m.read_property("event_type") == "START_NODE" ||m.read_property("event_type") == "RESET_NODE"
+              puts "CM card response: #{m.read_property("msg")}"
+              puts "Wating for node responce."
+              logger.info "#{m.read_property("msg")}, exit code: #{m.read_property("exit_code")}"
+            elsif m.read_property("event_type") == "EXIT"
+              puts "#{m.read_property("node_name")}: #{m.read_property("msg")}"
+              logger.info "#{m.read_property("msg")}, exit code: #{m.read_property("exit_code")}"
+              nof_nodes += 1
+              if nof_nodes == options[:target_nodes].length
+                comm.disconnect
+              end
+            end
+          when 'ERROR'
+            error m.read_content('reason') if m.read_content("itype") == 'ERROR'
+          when 'WARN'
+            warn m.read_content('reason') if m.read_content("itype") == 'WARN'
+          end
+        end
+      end
+      if options[:status] == "on"
+        options[:target_nodes].each do |node|
+          controller.configure(state: {node: node.to_sym, status: :on})
+        end
+      elsif options[:status] == "off"
+        options[:target_nodes].each do |node|
+          controller.configure(state: {node: node.to_sym, status: :off})
+        end
+      elsif options[:status] == "reset"
+        options[:target_nodes].each do |node|
+          controller.configure(state: {node: node.to_sym, status: :reset})
+        end
+      else
+        puts "Invalid value for -a, only on/off/reset values are available."
+        puts opt_parser
+        comm.disconnect
+      end
+    else
+      error controller.inspect
+    end
+  end
+end
+
+def stat(comm, options)
+  comm.subscribe('cm_factory') do |controller|
+    unless controller.error?
+      nof_nodes = 0
+      controller.on_message do |m|
+        if m.operation == :inform
+          case m.read_content("itype")
+          when 'STATUS'
+            if m.read_property("event_type") == "NODE_STATUS"
+              puts "#{m.read_property("node_name")} is #{m.read_property("msg")}"
+              logger.info "#{m.read_property("msg")}, exit code: #{m.read_property("exit_code")}"
+              nof_nodes += 1
+              if nof_nodes == options[:target_nodes].length
+                comm.disconnect
+              end
+            end
+          when 'ERROR'
+            error m.read_content('reason') if m.read_content("itype") == 'ERROR'
+          when 'WARN'
+            warn m.read_content('reason') if m.read_content("itype") == 'WARN'
+          end
+        end
+      end
+
+      options[:target_nodes].each do |node|
+        controller.configure(state: {node: node.to_sym, status: :get_status})
+      end
+    else
+      error controller.inspect
+      comm.disconnect
+    end
+  end
+end
+
+opt_parser.parse!
+
+entity_cert = File.expand_path(@auth[:entity_cert])
+entity_key = File.expand_path(@auth[:entity_key])
+entity = OmfCommon::Auth::Certificate.create_from_x509(File.read(entity_cert), File.read(entity_key))
+
+trusted_roots = File.expand_path(@auth[:root_cert_dir])
+
+#:development :production
+OmfCommon.init(:production, communication: { url: "xmpp://#{@xmpp[:username]}:#{@xmpp[:password]}@#{@xmpp[:server]}", auth: {} }) do
+  OmfCommon.comm.on_connected do |comm|
+    OmfCommon::Auth::CertificateStore.instance.register_default_certs(trusted_roots)
+    OmfCommon::Auth::CertificateStore.instance.register(entity, OmfCommon.comm.local_topic.address)
+    OmfCommon::Auth::CertificateStore.instance.register(entity)
+
+    info "Test script >> Connected to XMPP"
+
+    case ARGV[0]
+    when "load"
+      if !options[:image].nil? && options[:node].nil? && options[:status].nil? && !options[:target_nodes].nil?
+        if options[:last_action] == "reset" || options[:last_action] == "shutdown"
+          puts "call load on options #{options.inspect}"
+          load(comm, options)
+        else
+          puts "Invalid value for -l, only reset/shutdown values are available."
+          puts opt_parser
+          comm.disconnect
+        end
+      else
+        puts "Invalid arguements."
+        puts opt_parser
+        comm.disconnect
+      end
+    when "save"
+      if options[:image].nil? && !options[:node].nil? && options[:status].nil? && options[:target_nodes].nil?
+        if options[:last_action] == "reset" || options[:last_action] == "shutdown"
+          puts "call save on options #{options.inspect}"
+          save(comm, options)
+        else
+          puts "Invalid value for -l, only reset/shutdown values are available."
+          puts opt_parser
+          comm.disconnect
+        end
+      else
+        puts "Invalid arguements."
+        puts opt_parser
+        comm.disconnect
+      end
+    when "tell"
+      if options[:image].nil? && options[:node].nil? && !options[:status].nil? && !options[:target_nodes].nil?
+        if options[:status] == "on" || options[:status] == "off" || options[:status] == "reset"
+          puts "call tell on options #{options.inspect}"
+          tell(comm, options)
+        else
+          puts "Invalid value for -a, only on/off/reset values are available."
+          puts opt_parser
+          comm.disconnect
+        end
+      else
+        puts "Invalid arguements."
+        puts opt_parser
+        comm.disconnect
+      end
+    when "stat"
+      if options[:image].nil? && options[:node].nil? && options[:status].nil? && !options[:target_nodes].nil?
+        puts "call stat on options #{options.inspect}"
+        stat(comm, options)
+      else
+        puts "Invalid arguements."
+        puts opt_parser
+        comm.disconnect
+      end
+    else
+      puts "Invalid command / options."
+      puts opt_parser
+      comm.disconnect
+    end
+
+    comm.on_interrupted { comm.disconnect }
+  end
+end
