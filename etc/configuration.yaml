@@ -1,7 +1,7 @@
 :xmpp:
   :username: user
   :password: pw
-  :server: localhost
+  :server: testserver
 :auth:
   :root_cert_dir: ~/.omf/trusted_roots
   :entity_cert: ~/.omf/urc.pem
