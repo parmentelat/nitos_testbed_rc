@@ -1,6 +1,12 @@
 #frisbee client
 #created by parent :frisbee_factory
 #used in load command
+require 'net/telnet'
+require 'socket'
+require 'timeout'
+
+@config = YAML.load_file('../etc/configuration.yaml')
+$domain = @config[:domain][:ip]
 
 module OmfRc::ResourceProxy::Frisbee #frisbee client
   include OmfRc::ResourceProxyDSL

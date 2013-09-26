@@ -1,4 +1,8 @@
 #this resource is used to control chassis managers.
+require 'yaml'
+require 'open-uri'
+require 'nokogiri'
+
 
 module OmfRc::ResourceProxy::CMFactory
   include OmfRc::ResourceProxyDSL
@@ -116,8 +120,8 @@ module OmfRc::ResourceProxy::CMFactory
   end
 
   work("get_status") do |res, node|
-    puts "http://#{node[:node_cm_ip].to_s}/status"
-    doc = Nokogiri::XML(open("http://#{node[:node_cm_ip].to_s}/status"))
+    puts "http://#{node[:node_cm_ip].to_s}/state"
+    doc = Nokogiri::XML(open("http://#{node[:node_cm_ip].to_s}/state"))
     resp = doc.xpath("//Measurement//type//value").text.strip
 
     if resp == 'on'
@@ -133,8 +137,8 @@ module OmfRc::ResourceProxy::CMFactory
   end
 
   work('status') do |res, node|
-    puts "http://#{node[:node_cm_ip].to_s}/status"
-    doc = Nokogiri::XML(open("http://#{node[:node_cm_ip].to_s}/status"))
+    puts "http://#{node[:node_cm_ip].to_s}/state"
+    doc = Nokogiri::XML(open("http://#{node[:node_cm_ip].to_s}/state"))
     puts doc
 
     res.inform(:status, {
