@@ -1,5 +1,6 @@
 #!/usr/bin/env ruby
 
+require 'time'
 require 'omf_rc'
 require 'omf_common'
 require 'yaml'
@@ -25,18 +26,18 @@ entity = OmfCommon::Auth::Certificate.create_from_x509(File.read(entity_cert), F
 
 trusted_roots = File.expand_path(@auth[:root_cert_dir])
 
-OmfCommon.init(:development, communication: { url: "xmpp://#{@xmpp[:username]}:#{@xmpp[:password]}@#{@xmpp[:server]}", auth: {} }) do
+OmfCommon.init(:development, communication: { url: "xmpp://proxy_user:#{@xmpp[:password]}@#{@xmpp[:server]}", auth: {} }) do
   OmfCommon.comm.on_connected do |comm|
     OmfCommon::Auth::CertificateStore.instance.register_default_certs(trusted_roots)
     OmfCommon::Auth::CertificateStore.instance.register(entity, OmfCommon.comm.local_topic.address)
     OmfCommon::Auth::CertificateStore.instance.register(entity)
 
     info "User Factory >> Connected to XMPP server"
-    userFact = OmfRc::ResourceFactory.create(:user_factory, { uid: 'userFactory', certificate: entity })
+    userFact = OmfRc::ResourceFactory.create(:user_factory, { uid: 'user_factory', certificate: entity })
     info "CM Factory >> Connected to XMPP server"
-    cmFact = OmfRc::ResourceFactory.create(:cm_factory, { uid: 'cmFactory', certificate: entity })
+    cmFact = OmfRc::ResourceFactory.create(:cm_factory, { uid: 'cm_factory', certificate: entity })
     info "Frisbee Factory >> Connected to XMPP server"
-    frisbeeFact = OmfRc::ResourceFactory.create(:frisbee_factory, { uid: 'frisbeeFactory', certificate: entity })
+    frisbeeFact = OmfRc::ResourceFactory.create(:frisbee_factory, { uid: 'frisbee_factory', certificate: entity })
 
     comm.on_interrupted {
       userFact.disconnect
