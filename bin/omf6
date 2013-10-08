@@ -324,6 +324,13 @@ def stat(comm, options)
               if nof_nodes == options[:target_nodes].length
                 comm.disconnect
               end
+            elsif m.read_property("event_type") == "EXIT"
+              puts "ERROR: #{m.read_property("node")} - #{m.read_property("msg")}"
+              logger.info "#{m.read_property("msg")}, exit code: #{m.read_property("exit_code")}"
+              nof_nodes += 1
+              if nof_nodes == options[:target_nodes].length
+                comm.disconnect
+              end
             end
           when 'ERROR'
             error m.read_content('reason') if m.read_content("itype") == 'ERROR'
@@ -352,7 +359,7 @@ entity = OmfCommon::Auth::Certificate.create_from_x509(File.read(entity_cert), F
 trusted_roots = File.expand_path(@auth[:root_cert_dir])
 
 #:development :production
-OmfCommon.init(:development, communication: { url: "xmpp://#{@xmpp[:username]}:#{@xmpp[:password]}@#{@xmpp[:server]}", auth: {} }) do
+OmfCommon.init(:development, communication: { url: "xmpp://#{@xmpp[:script_user]}:#{@xmpp[:password]}@#{@xmpp[:server]}", auth: {} }) do
   OmfCommon.comm.on_connected do |comm|
     OmfCommon::Auth::CertificateStore.instance.register_default_certs(trusted_roots)
     OmfCommon::Auth::CertificateStore.instance.register(entity, OmfCommon.comm.local_topic.address)
