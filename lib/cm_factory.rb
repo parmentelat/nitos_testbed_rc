@@ -10,18 +10,19 @@ module OmfRc::ResourceProxy::CMFactory
 
   register_proxy :cm_factory
 
-  property :all_nodes, :default => []
+#   property :all_nodes, :default => []
   property :node_state
 
   hook :before_ready do |res|
     @config = YAML.load_file('../etc/configuration.yaml')
     @domain = @config[:domain]
-    @nodes = @config[:nodes]
-    puts "### nodes: #{@nodes}"
-    @nodes.each do |node|
-      tmp = {node_name: node[0], node_ip: node[1][:ip], node_mac: node[1][:mac], node_cm_ip: node[1][:cm_ip]}
-      res.property.all_nodes << tmp
-    end
+#   ->before integrating with Broker, this was the way we took ip's for the nodes
+#     @nodes = @config[:nodes]
+#     puts "### nodes: #{@nodes}"
+#     @nodes.each do |node|
+#       tmp = {node_name: node[0], node_ip: node[1][:ip], node_mac: node[1][:mac], node_cm_ip: node[1][:cm_ip]}
+#       res.property.all_nodes << tmp
+#     end
   end
 
 #   request :node_state do |res|
@@ -49,35 +50,122 @@ module OmfRc::ResourceProxy::CMFactory
 #   end
 
   configure :state do |res, value|
-    node = nil
-    res.property.all_nodes.each do |n|
-      if n[:node_name] == value[:node].to_sym
-        node = n
+#     acc = res.find_account_name(res)
+#     puts "Account : #{acc}"
+#     if acc.nil?
+#       puts "error: acc nill"
+#       res.inform(:status, {
+#         event_type: "EXIT",
+#         exit_code: "-1",
+#         node: value[:node],
+#         msg: "Wrong account name."
+#       }, :ALL)
+#       return
+#     end
+#     puts "$$$$ #{value[:node]}"
+#     node = res.get_node(res, value[:node])
+#     if node.nil?
+#       puts "error: Node nill"
+#       res.inform(:status, {
+#         event_type: "EXIT",
+#         exit_code: "-1",
+#         node: value[:node],
+#         msg: "Wrong node name."
+#       }, :ALL)
+#       next
+#     end
+#     puts "Node : #{node}"
+
+#     lease_ok = res.check_lease(res, node, account)
+#     if !lease_ok
+#       puts "error: Node not leased"
+#       res.inform(:status, {
+#         event_type: "EXIT",
+#         exit_code: "-1",
+#         node: value[:node],
+#         msg: "Node not leased by that user."
+#       }, :ALL)
+#       return
+#     end
+
+    OmfCommon.comm.subscribe("am_controller") do |am_con|
+      acc = res.find_account_name(res)
+      if acc.nil?
+        puts "error: acc nill"
+        res.inform(:status, {
+          event_type: "EXIT",
+          exit_code: "-1",
+          node: value[:node],
+          msg: "Wrong account name."
+        }, :ALL)
+        next
+      end
+
+      am_con.request([:nodes]) do |msg|
+        nodes = msg.read_property("nodes")[:resources]
+        node = nil
+        puts "aaaa #{nodes.inspect} | #{value[:node]}"
+        nodes.each do |n|
+          if n[:resource][:name] == value[:node].to_s
+            node = n
+            break
+          end
+        end
+        puts "+++++++++++++ #{node.inspect}"
+
+        if node.nil?
+          puts "error: Node nill"
+          am_con.inform(:status, {
+            event_type: "EXIT",
+            exit_code: "-1",
+            node: value[:node],
+            msg: "Wrong node name."
+          }, :ALL)
+          next
+        else
+          am_con.request([:leases]) do |msg|
+            leases = msg.read_property("leases")[:resources]
+            lease = nil
+            puts "aaaa #{leases.inspect}"
+            leases.each do |s|
+
+            end
+          end
+        end
+
+        case value[:status].to_sym
+        when :on then res.start_node(node)
+        when :off then res.stop_node(node)
+        when :reset then res.reset_node(node)
+        when :start_on_pxe then res.start_node_pxe(node)
+        when :start_without_pxe then res.start_node_pxe_off(node, value[:last_action])
+        when :get_status then res.status(node)
+        else
+          res.log_inform_warn "Cannot switch node to unknown state '#{value[:status].to_s}'!"
+        end
       end
     end
-    puts "Node : #{node}"
-    if node.nil?
-      puts "error: Node nill"
-      res.inform(:status, {
-        event_type: "EXIT",
-        exit_code: "-1",
-        node: value[:node],
-        msg: "Wrong node name."
-      }, :ALL)
-      return
-    end
-
-    case value[:status].to_sym
-    when :on then res.start_node(node)
-    when :off then res.stop_node(node)
-    when :reset then res.reset_node(node)
-    when :start_on_pxe then res.start_node_pxe(node)
-    when :start_without_pxe then res.start_node_pxe_off(node, value[:last_action])
-    when :get_status then res.status(node)
-    else
-      res.log_inform_warn "Cannot switch node to unknown state '#{value[:status].to_s}'!"
-    end
   end
+
+  work("find_account_name") do |res|#most likely another input will be required
+    #TODO find the account from the authentication key that is used in the xmpp message
+    #at the moment always return root as account, return nil if it fails
+    acc_name = "root"
+    acc_name
+  end
+
+#   work("get_node") do |res, node_name|
+#     OmfCommon.comm.subscribe("am_controller") do |res|
+#       res.request([:nodes]) do |msg|
+#         node = msg.read_property("node")
+#         puts "+++++++++++++ #{node}"
+#       end
+#     end
+#   end
+#
+#   work("check_lease") do |res, node, account|
+#
+#   end
 
   work("wait_until_ping") do |res, ip|
     t = 0
@@ -136,7 +224,7 @@ module OmfRc::ResourceProxy::CMFactory
     end
   end
 
-  work('status') do |res, node|
+  work("status") do |res, node|
     puts "http://#{node[:node_cm_ip].to_s}/state"
     doc = Nokogiri::XML(open("http://#{node[:node_cm_ip].to_s}/state"))
     puts doc
