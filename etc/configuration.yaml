@@ -1,5 +1,6 @@
 :xmpp:
-  :username: user
+  :proxy_user: proxy_user
+  :script_user: script_user
   :password: pw
   :server: testserver
 :auth:
