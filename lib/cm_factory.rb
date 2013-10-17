@@ -2,6 +2,7 @@
 require 'yaml'
 require 'open-uri'
 require 'nokogiri'
+require 'pp'
 
 
 module OmfRc::ResourceProxy::CMFactory
@@ -50,43 +51,6 @@ module OmfRc::ResourceProxy::CMFactory
 #   end
 
   configure :state do |res, value|
-#     acc = res.find_account_name(res)
-#     puts "Account : #{acc}"
-#     if acc.nil?
-#       puts "error: acc nill"
-#       res.inform(:status, {
-#         event_type: "EXIT",
-#         exit_code: "-1",
-#         node: value[:node],
-#         msg: "Wrong account name."
-#       }, :ALL)
-#       return
-#     end
-#     puts "$$$$ #{value[:node]}"
-#     node = res.get_node(res, value[:node])
-#     if node.nil?
-#       puts "error: Node nill"
-#       res.inform(:status, {
-#         event_type: "EXIT",
-#         exit_code: "-1",
-#         node: value[:node],
-#         msg: "Wrong node name."
-#       }, :ALL)
-#       next
-#     end
-#     puts "Node : #{node}"
-
-#     lease_ok = res.check_lease(res, node, account)
-#     if !lease_ok
-#       puts "error: Node not leased"
-#       res.inform(:status, {
-#         event_type: "EXIT",
-#         exit_code: "-1",
-#         node: value[:node],
-#         msg: "Node not leased by that user."
-#       }, :ALL)
-#       return
-#     end
 
     OmfCommon.comm.subscribe("am_controller") do |am_con|
       acc = res.find_account_name(res)
@@ -104,14 +68,15 @@ module OmfRc::ResourceProxy::CMFactory
       am_con.request([:nodes]) do |msg|
         nodes = msg.read_property("nodes")[:resources]
         node = nil
-        puts "aaaa #{nodes.inspect} | #{value[:node]}"
         nodes.each do |n|
           if n[:resource][:name] == value[:node].to_s
             node = n
             break
           end
         end
-        puts "+++++++++++++ #{node.inspect}"
+        puts "++++++++++++++++++++++"
+        pp node
+        puts "++++++++++++++++++++++"
 
         if node.nil?
           puts "error: Node nill"
@@ -124,24 +89,56 @@ module OmfRc::ResourceProxy::CMFactory
           next
         else
           am_con.request([:leases]) do |msg|
-            leases = msg.read_property("leases")[:resources]
+            leases = msg.read_property("leases")
             lease = nil
-            puts "aaaa #{leases.inspect}"
-            leases.each do |s|
+            puts "----------------------"
+            pp leases
+            puts "----------------------"
+            leases.each do |l|
+              if Time.parse(l[:valid_from]) <= Time.now && Time.parse(l[:valid_until]) >= Time.now
+                l[:component_names].each do |c|
+                  puts "#{c[:account]} == #{acc}"
+                  if c[:component_name] == value[:node].to_s && l[:account] == acc
+                    lease = l
+                    break #found the correct lease
+                  end
+                end
+              end
+            end
 
+            if lease.nil? #if lease is nil it means no matching lease is found
+              puts "error: Lease nill"
+              am_con.inform(:status, {
+                event_type: "EXIT",
+                exit_code: "-1",
+                node: value[:node],
+                msg: "Node is not leased by your account."
+              }, :ALL)
+              next
+            else
+              nod = {}
+              nod[:node_name] = node[:resource][:name]
+              node[:resource][:interfaces].each do |i|
+                if i[:role] == "control_network"
+                  nod[:node_ip] = i[:ip][:address]
+                  nod[:node_mac] = i[:mac]
+                elsif i[:role] == "cm_network"
+                  nod[:node_cm_ip] = i[:ip][:address]
+                end
+              end
+
+              case value[:status].to_sym
+              when :on then res.start_node(nod)
+              when :off then res.stop_node(nod)
+              when :reset then res.reset_node(nod)
+              when :start_on_pxe then res.start_node_pxe(nod)
+              when :start_without_pxe then res.start_node_pxe_off(nod, value[:last_action])
+              when :get_status then res.status(nod)
+              else
+                res.log_inform_warn "Cannot switch node to unknown state '#{value[:status].to_s}'!"
+              end
             end
           end
-        end
-
-        case value[:status].to_sym
-        when :on then res.start_node(node)
-        when :off then res.stop_node(node)
-        when :reset then res.reset_node(node)
-        when :start_on_pxe then res.start_node_pxe(node)
-        when :start_without_pxe then res.start_node_pxe_off(node, value[:last_action])
-        when :get_status then res.status(node)
-        else
-          res.log_inform_warn "Cannot switch node to unknown state '#{value[:status].to_s}'!"
         end
       end
     end
