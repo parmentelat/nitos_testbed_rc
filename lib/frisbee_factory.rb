@@ -1,7 +1,7 @@
 
 
 
-$all_nodes = []
+#$all_nodes = []
 $ports = []
 module OmfRc::ResourceProxy::FrisbeeFactory
   include OmfRc::ResourceProxyDSL
@@ -20,12 +20,12 @@ module OmfRc::ResourceProxy::FrisbeeFactory
 
   hook :before_ready do |res|
     @config = YAML.load_file('../etc/configuration.yaml')
-    @nodes = @config[:nodes]
-
-    @nodes.each do |node|
-      tmp = {node_name: node[0], node_ip: node[1][:ip], node_mac: node[1][:mac], node_cm_ip: node[1][:cm_ip]}
-      $all_nodes << tmp
-    end
+#     @nodes = @config[:nodes]
+#
+#     @nodes.each do |node|
+#       tmp = {node_name: node[0], node_ip: node[1][:ip], node_mac: node[1][:mac], node_cm_ip: node[1][:cm_ip]}
+#       $all_nodes << tmp
+#     end
   end
 
 #   def port_open?(port, seconds=1)
