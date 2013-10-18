@@ -74,13 +74,10 @@ module OmfRc::ResourceProxy::CMFactory
             break
           end
         end
-        puts "++++++++++++++++++++++"
-        pp node
-        puts "++++++++++++++++++++++"
 
         if node.nil?
           puts "error: Node nill"
-          am_con.inform(:status, {
+          client.inform(:status, {
             event_type: "EXIT",
             exit_code: "-1",
             node: value[:node],
@@ -91,13 +88,9 @@ module OmfRc::ResourceProxy::CMFactory
           am_con.request([:leases]) do |msg|
             leases = msg.read_property("leases")
             lease = nil
-            puts "----------------------"
-            pp leases
-            puts "----------------------"
             leases.each do |l|
               if Time.parse(l[:valid_from]) <= Time.now && Time.parse(l[:valid_until]) >= Time.now
                 l[:component_names].each do |c|
-                  puts "#{c[:account]} == #{acc}"
                   if c[:component_name] == value[:node].to_s && l[:account] == acc
                     lease = l
                     break #found the correct lease
@@ -108,7 +101,7 @@ module OmfRc::ResourceProxy::CMFactory
 
             if lease.nil? #if lease is nil it means no matching lease is found
               puts "error: Lease nill"
-              am_con.inform(:status, {
+              client.inform(:status, {
                 event_type: "EXIT",
                 exit_code: "-1",
                 node: value[:node],
