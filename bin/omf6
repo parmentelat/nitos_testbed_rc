@@ -34,6 +34,7 @@ def create_frisbeed(comm, fcontroller, port, options)
     #image "/var/lib/omf-images-5.4/baseline.ndz"
     if reply_msg.success?
       server = reply_msg.resource
+      @@server = server
       server.on_subscribed do
         server.on_message do |m|
           if m.operation == :inform
@@ -79,7 +80,9 @@ def create_frisbee(comm, fcontroller, node, port, options)
                         @nof_nodes_up_without_pxe += 1
                         if @nof_nodes == @nof_nodes_up_without_pxe
                           puts "load proccess completed."
-                          comm.disconnect
+                          fcontroller.release(@@server) do |reply_msg|
+                            comm.disconnect
+                          end
                         end
                       end
                     when 'ERROR'
@@ -159,6 +162,7 @@ def create_imagezip_server(comm, fcontroller, port, options)
     #image "/var/lib/omf-images-5.4/baseline.ndz"
     if reply_msg.success?
       server = reply_msg.resource
+      @@server = server
       server.on_subscribed do
         server.on_message do |m|
           if m.operation == :inform
@@ -195,7 +199,9 @@ def create_imagezip_client(comm, fcontroller, node, port, options)
                     when 'STATUS'
                       if msg.read_property("event_type") == "PXE_OFF"
                         puts "save proccess completed. Image was saved on file '/tmp/image.ndz'"
-                        comm.disconnect
+                        fcontroller.release(@@server) do |reply_msg|
+                          comm.disconnect
+                        end
                       end
                     when 'ERROR'
                       error msg.read_content('reason') if m.read_content("itype") == 'ERROR'

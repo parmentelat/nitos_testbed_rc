@@ -23,9 +23,15 @@ module OmfRc::ResourceProxy::ImagezipServer #Imagezip server
   hook :after_initial_configured do |server|
     server.property.app_id = server.hrn.nil? ? server.uid : server.hrn
 
-    ExecApp.new(server.property.app_id, server.build_command_line, server.property.map_err_to_out) do |event_type, app_id, msg|
+    @app = ExecApp.new(server.property.app_id, server.build_command_line, server.property.map_err_to_out) do |event_type, app_id, msg|
       server.process_event(server, event_type, app_id, msg)
     end
+  end
+
+  hook :before_release do |server|
+    #not needed, stops by default
+    #@app.signal(signal = 'KILL')
+    $ports.delete_if {|x| x == server.property.port}
   end
 
   def process_event(res, event_type, app_id, msg)

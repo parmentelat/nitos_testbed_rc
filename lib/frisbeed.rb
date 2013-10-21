@@ -26,9 +26,14 @@ module OmfRc::ResourceProxy::Frisbeed
     server.property.app_id = server.hrn.nil? ? server.uid : server.hrn
 
 
-    ExecApp.new(server.property.app_id, server.build_command_line, server.property.map_err_to_out) do |event_type, app_id, msg|
+    @app = ExecApp.new(server.property.app_id, server.build_command_line, server.property.map_err_to_out) do |event_type, app_id, msg|
       server.process_event(server, event_type, app_id, msg)
     end
+  end
+
+  hook :before_release do |server|
+    @app.signal(signal = 'KILL')
+    $ports.delete_if {|x| x == server.property.port}
   end
 
   # This method processes an event coming from the application instance, which
