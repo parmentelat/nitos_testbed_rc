@@ -88,10 +88,10 @@ module OmfRc::ResourceProxy::CMFactory
           am_con.request([:leases]) do |msg|
             leases = msg.read_property("leases")
             lease = nil
-            leases.each do |l|
-              if Time.parse(l[:valid_from]) <= Time.now && Time.parse(l[:valid_until]) >= Time.now
-                l[:component_names].each do |c|
-                  if c[:component_name] == value[:node].to_s && l[:account] == acc
+            leases[:resources].each do |l|
+              if Time.parse(l[:resource][:valid_from]) <= Time.now && Time.parse(l[:resource][:valid_until]) >= Time.now
+                l[:resource][:components].each do |c|
+                  if c[:component][:name] == value[:node].to_s && l[:resource][:account][:name] == acc
                     lease = l
                     break #found the correct lease
                   end
