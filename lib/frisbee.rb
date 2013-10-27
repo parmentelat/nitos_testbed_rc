@@ -6,7 +6,6 @@ require 'socket'
 require 'timeout'
 
 @config = YAML.load_file('../etc/configuration.yaml')
-$domain = @config[:domain][:ip]
 
 module OmfRc::ResourceProxy::Frisbee #frisbee client
   include OmfRc::ResourceProxyDSL
