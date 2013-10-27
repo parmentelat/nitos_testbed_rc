@@ -2,6 +2,8 @@
 #created by parent :frisbee_factory
 #used in save command
 
+#$domain = @config[:domain][:ip]
+
 module OmfRc::ResourceProxy::ImagezipClient #Imagezip client
   include OmfRc::ResourceProxyDSL
 

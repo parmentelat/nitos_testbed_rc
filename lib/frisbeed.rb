@@ -2,6 +2,8 @@
 #created by parent :frisbee_factory
 #used in load command
 
+#$domain = @config[:domain][:ip]
+
 module OmfRc::ResourceProxy::Frisbeed
   include OmfRc::ResourceProxyDSL
 
@@ -24,7 +26,7 @@ module OmfRc::ResourceProxy::Frisbeed
 
    hook :after_initial_configured do |server|
     server.property.app_id = server.hrn.nil? ? server.uid : server.hrn
-
+    server.property.multicast_interface = "#{$domain}200"
 
     @app = ExecApp.new(server.property.app_id, server.build_command_line, server.property.map_err_to_out) do |event_type, app_id, msg|
       server.process_event(server, event_type, app_id, msg)
@@ -72,8 +74,8 @@ module OmfRc::ResourceProxy::Frisbeed
   work('build_command_line') do |res|
     cmd_line = "env -i " # Start with a 'clean' environment
     cmd_line += res.property.binary_path + " " # the /usr/sbin/frisbeed
-    cmd_line += "-i " +  res.property.multicast_interface + " " # -i for interface
-    cmd_line += "-m " +  res.property.multicast_address + " "   # -m for address
+    cmd_line += "-i " + res.property.multicast_interface + " " # -i for interface
+    cmd_line += "-m " + res.property.multicast_address + " "   # -m for address
     cmd_line += "-p " + res.property.port.to_s  + " "           # -p for port
     cmd_line += "-W " + res.property.speed.to_s + " "           # -W for bandwidth
     cmd_line += res.property.image                              # image no arguement

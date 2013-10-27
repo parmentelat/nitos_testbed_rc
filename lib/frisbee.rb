@@ -5,7 +5,7 @@ require 'net/telnet'
 require 'socket'
 require 'timeout'
 
-@config = YAML.load_file('../etc/configuration.yaml')
+#@config = YAML.load_file('../etc/proxies_conf.yaml')
 
 module OmfRc::ResourceProxy::Frisbee #frisbee client
   include OmfRc::ResourceProxyDSL

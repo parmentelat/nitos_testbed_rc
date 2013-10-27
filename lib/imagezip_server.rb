@@ -22,6 +22,7 @@ module OmfRc::ResourceProxy::ImagezipServer #Imagezip server
 
   hook :after_initial_configured do |server|
     server.property.app_id = server.hrn.nil? ? server.uid : server.hrn
+    server.property.multicast_interface = "#{$domain}200"
 
     @app = ExecApp.new(server.property.app_id, server.build_command_line, server.property.map_err_to_out) do |event_type, app_id, msg|
       server.process_event(server, event_type, app_id, msg)

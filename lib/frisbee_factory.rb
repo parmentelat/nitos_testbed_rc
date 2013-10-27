@@ -19,7 +19,7 @@ module OmfRc::ResourceProxy::FrisbeeFactory
   end
 
   hook :before_ready do |res|
-    @config = YAML.load_file('../etc/configuration.yaml')
+    #@config = YAML.load_file('../etc/proxies_conf.yaml')
 #     @nodes = @config[:nodes]
 #
 #     @nodes.each do |node|
