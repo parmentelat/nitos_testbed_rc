@@ -4,7 +4,7 @@ require 'time'
 require 'omf_common'
 require 'optparse'
 
-@config = YAML.load_file('../etc/configuration.yaml')
+@config = YAML.load_file('../etc/omf_script_conf.yaml')
 @auth = @config[:auth]
 @xmpp = @config[:xmpp]
 
@@ -76,9 +76,10 @@ def create_frisbee(comm, fcontroller, node, port, options)
                     case msg.read_content("itype")
                     when 'STATUS'
                       if msg.read_property("event_type") == "PXE_OFF"
-                        puts "#{options[:last_action]} node '#{msg.read_property("node")}' out of PXE."
-                        @nof_nodes_up_without_pxe += 1
-                        if @nof_nodes == @nof_nodes_up_without_pxe
+                        puts "#{options[:last_action]} node '#{msg.read_property("node_name")}' out of PXE."
+                        n = msg.read_property("node")
+                        @nodes_up_without_pxe << n
+                        if @nodes_up_pxe.length == (@nodes_up_without_pxe.length + @nodes_failed_without_pxe.length)
                           puts "load proccess completed."
                           fcontroller.release(@@server) do |reply_msg|
                             comm.disconnect
@@ -86,13 +87,50 @@ def create_frisbee(comm, fcontroller, node, port, options)
                         end
                       end
                     when 'ERROR'
-                      error msg.read_content('reason') if m.read_content("itype") == 'ERROR'
+                      case m.read_property("event_type")
+                      when "ACCOUNT"
+                        logger.info "#{m.read_property("msg")}, exit code: #{m.read_property("exit_code")}"
+                        comm.disconnect
+                      when "NODE"
+                        logger.info "#{m.read_property("msg")}, exit code: #{m.read_property("exit_code")}"
+                        n = m.read_property("node_name")
+                        @nodes_failed_without_pxe << n
+                        if (@nodes_up_without_pxe.length + @nodes_failed_without_pxe.length) == options[:target_nodes].length
+                          comm.disconnect
+                        end
+                      when "LEASE"
+                        logger.info "#{m.read_property("msg")}, exit code: #{m.read_property("exit_code")}"
+                        n = m.read_property("node_name")
+                        @nodes_failed_without_pxe << n
+                        if (@nodes_up_without_pxe.length + @nodes_failed_without_pxe.length) == options[:target_nodes].length
+                          comm.disconnect
+                        end
+                      when "HTTP"
+                        logger.info "#{m.read_property("msg")}, exit code: #{m.read_property("exit_code")}"
+                        n = m.read_property("node_name")
+                        if @nodes_retrying_without_pxe.include?(n)
+                          @nodes_retrying_without_pxe.delete(n)
+                          @nodes_failed_without_pxe << n
+                          if (@nodes_up_without_pxe.length + @nodes_failed_without_pxe.length) == options[:target_nodes].length
+                            puts "load proccess completed."
+                            fcontroller.release(@@server) do |reply_msg|
+                              comm.disconnect
+                            end
+                          end
+                        else
+                          @nodes_retrying_without_pxe << n
+                          controller.configure(state: {node: n.to_sym, status: :start_on_pxe})
+                        end
+                      else
+                        error m.read_content('reason') if m.read_content("itype") == 'ERROR'
+                        comm.disconnect
+                      end
                     when 'WARN'
                       warn msg.read_content('reason') if m.read_content("itype") == 'WARN'
                     end
                   end
                 end
-                puts "#{options[:last_action]} node '#{m.read_property("node")}' out of PXE."
+                puts "#{options[:last_action]} node '#{m.read_property("node_name")}' out of PXE."
                 controller.configure(state: {node: node.to_sym, status: :start_without_pxe, last_action: options[:last_action]})
               end
             end
@@ -110,18 +148,22 @@ def load(comm, options)
     #TODO handle the case some nodes are not up and running
     unless controller.error?
       @nof_nodes = options[:target_nodes].length
-      @nof_nodes_up_frisbee = 0
-      @nof_nodes_up_without_pxe = 0
-      nof_nodes_up_pxe = 0
+      @nodes_up_without_pxe = []
+      @nodes_failed_without_pxe = []
+      @nodes_retrying_without_pxe = []
+      @nodes_up_pxe = []
+      nodes_failed_pxe = []
+      nodes_retrying_pxe = []
       port = nil
       controller.on_message do |m|
-        if m.operation == :inform && m.read_property("event_type") == "PXE"
+        if m.operation == :inform
           case m.read_content("itype")
           when 'STATUS'
             logger.info "#{m.read_property("msg")}, exit code: #{m.read_property("exit_code")}"
-            if m.read_property("exit_code") == 0
-              nof_nodes_up_pxe += 1
-              if @nof_nodes == nof_nodes_up_pxe #all nodes are up and running on pxe
+            if m.read_property("exit_code") == 0 && m.read_property("event_type") == "PXE"
+              n = m.read_property("node_name")
+              @nodes_up_pxe << n
+              if @nof_nodes == (@nodes_up_pxe.length + nodes_failed_pxe.length) #all nodes are up and running on pxe
                 puts "all nodes are up and running on pxe."
                 comm.subscribe('frisbee_factory') do |fcontroller|
                   puts "requesting available port"
@@ -129,7 +171,7 @@ def load(comm, options)
                     port = m.read_property("ports")
                     puts "running frisbee server on port '#{port}'"
                     create_frisbeed(comm, fcontroller, port, options)
-                    options[:target_nodes].each do |node|
+                    @nodes_up_pxe.each do |node|
                       create_frisbee(comm, fcontroller, node, port, options) #frisbee client
                     end
                     puts "running frisbee client on specified nodes."
@@ -140,7 +182,41 @@ def load(comm, options)
               error "exit code: #{m.read_content('exit_code')}"
             end
           when 'ERROR'
-            error m.read_content('reason') if m.read_content("itype") == 'ERROR'
+            case m.read_property("event_type")
+            when "ACCOUNT"
+              logger.info "#{m.read_property("msg")}, exit code: #{m.read_property("exit_code")}"
+              comm.disconnect
+            when "NODE"
+              logger.info "#{m.read_property("msg")}, exit code: #{m.read_property("exit_code")}"
+              n = m.read_property("node_name")
+              nodes_failed_pxe << n
+              if (@nodes_up_pxe.length + nodes_failed_pxe.length) == options[:target_nodes].length
+                comm.disconnect
+              end
+            when "LEASE"
+              logger.info "#{m.read_property("msg")}, exit code: #{m.read_property("exit_code")}"
+              n = m.read_property("node_name")
+              nodes_failed_pxe << n
+              if (@nodes_up_pxe.length + nodes_failed_failed.length) == options[:target_nodes].length
+                comm.disconnect
+              end
+            when "HTTP"
+              logger.info "#{m.read_property("msg")}, exit code: #{m.read_property("exit_code")}"
+              n = m.read_property("node_name")
+              if nodes_retrying_pxe.include?(n)
+                nodes_retrying_pxe.delete(n)
+                nodes_failed_pxe << n
+                if (@nodes_up_pxe.length + nodes_failed_pxe.length) == options[:target_nodes].length
+                  comm.disconnect
+                end
+              else
+                nodes_retrying_pxe << n
+                controller.configure(state: {node: n.to_sym, status: :start_on_pxe})
+              end
+            else
+              error m.read_content('reason') if m.read_content("itype") == 'ERROR'
+              comm.disconnect
+            end
           when 'WARN'
             warn m.read_content('reason') if m.read_content("itype") == 'WARN'
           end
@@ -205,6 +281,9 @@ def create_imagezip_client(comm, fcontroller, node, port, options)
                       end
                     when 'ERROR'
                       error msg.read_content('reason') if m.read_content("itype") == 'ERROR'
+                      fcontroller.release(@@server) do |reply_msg|
+                        comm.disconnect
+                      end
                     when 'WARN'
                       warn msg.read_content('reason') if m.read_content("itype") == 'WARN'
                     end
@@ -229,11 +308,11 @@ def save(comm, options)
     unless controller.error?
       port = nil
       controller.on_message do |m|
-        if m.operation == :inform && m.read_property("event_type") == "PXE"
+        if m.operation == :inform
           case m.read_content("itype")
           when 'STATUS'
             logger.info "#{m.read_property("msg")}, exit code: #{m.read_property("exit_code")}"
-            if m.read_property("exit_code") == 0
+            if m.read_property("exit_code") == 0 && m.read_property("event_type") == "PXE"
               puts "node is up and running on pxe."
               comm.subscribe('frisbee_factory') do |fcontroller|
                 puts "requesting available port"
@@ -248,9 +327,11 @@ def save(comm, options)
               end
             else
               error "exit code: #{m.read_content('exit_code')}"
+              conn.disconnect
             end
           when 'ERROR'
             error m.read_content('reason') if m.read_content("itype") == 'ERROR'
+            conn.disconnect
           when 'WARN'
             warn m.read_content('reason') if m.read_content("itype") == 'WARN'
           end
@@ -268,7 +349,9 @@ end
 def tell(comm, options)
   comm.subscribe('cm_factory') do |controller|
     unless controller.error?
-      nof_nodes = 0
+      nodes_failed = []
+      nodes_ok = []
+      nodes_retrying = []
       controller.on_message do |m|
         if m.operation == :inform
           case m.read_content("itype")
@@ -280,13 +363,49 @@ def tell(comm, options)
             elsif m.read_property("event_type") == "EXIT"
               puts "#{m.read_property("node_name")}: #{m.read_property("msg")}"
               logger.info "#{m.read_property("msg")}, exit code: #{m.read_property("exit_code")}"
-              nof_nodes += 1
-              if nof_nodes == options[:target_nodes].length
+              n = m.read_property("node_name")
+              nodes_ok << n
+              if (nodes_ok.length + nodes_failed.length) == options[:target_nodes].length
                 comm.disconnect
               end
             end
           when 'ERROR'
-            error m.read_content('reason') if m.read_content("itype") == 'ERROR'
+            case m.read_property("event_type")
+            when "ACCOUNT"
+              logger.info "#{m.read_property("msg")}, exit code: #{m.read_property("exit_code")}"
+              comm.disconnect
+            when "NODE"
+              logger.info "#{m.read_property("msg")}, exit code: #{m.read_property("exit_code")}"
+              n = m.read_property("node_name")
+              nodes_failed << n
+              if (nodes_ok.length + nodes_failed.length) == options[:target_nodes].length
+                comm.disconnect
+              end
+            when "LEASE"
+              logger.info "#{m.read_property("msg")}, exit code: #{m.read_property("exit_code")}"
+              n = m.read_property("node_name")
+              nodes_failed << n
+              if (nodes_ok.length + nodes_failed.length) == options[:target_nodes].length
+                comm.disconnect
+              end
+            when "HTTP"
+              logger.info "#{m.read_property("msg")}, exit code: #{m.read_property("exit_code")}"
+              n = m.read_property("node_name")
+              if nodes_retrying.include?(n)
+                nodes_retrying.delete(n)
+                nodes_failed << n
+                if (nodes_ok.length + nodes_failed.length) == options[:target_nodes].length
+                  comm.disconnect
+                end
+              else
+                nodes_retrying << n
+                info "retrying to send message #{options[:status]} to node #{n}"
+                controller.configure(state: {node: n.to_sym, status: options[:status].to_sym})
+              end
+            else
+              error m.read_content('reason') if m.read_content("itype") == 'ERROR'
+              comm.disconnect
+            end
           when 'WARN'
             warn m.read_content('reason') if m.read_content("itype") == 'WARN'
           end
@@ -339,7 +458,42 @@ def stat(comm, options)
               end
             end
           when 'ERROR'
-            error m.read_content('reason') if m.read_content("itype") == 'ERROR'
+            case m.read_property("event_type")
+            when "ACCOUNT"
+              logger.info "#{m.read_property("msg")}, exit code: #{m.read_property("exit_code")}"
+              comm.disconnect
+            when "NODE"
+              logger.info "#{m.read_property("msg")}, exit code: #{m.read_property("exit_code")}"
+              n = m.read_property("node_name")
+              nodes_failed << n
+              if (nodes_ok.length + nodes_failed.length) == options[:target_nodes].length
+                comm.disconnect
+              end
+            when "LEASE"
+              logger.info "#{m.read_property("msg")}, exit code: #{m.read_property("exit_code")}"
+              n = m.read_property("node_name")
+              nodes_failed << n
+              if (nodes_ok.length + nodes_failed.length) == options[:target_nodes].length
+                comm.disconnect
+              end
+            when "HTTP"
+              logger.info "#{m.read_property("msg")}, exit code: #{m.read_property("exit_code")}"
+              n = m.read_property("node_name")
+              if nodes_retrying.include?(n)
+                nodes_retrying.delete(n)
+                nodes_failed << n
+                if (nodes_ok.length + nodes_failed.length) == options[:target_nodes].length
+                  comm.disconnect
+                end
+              else
+                nodes_retrying << n
+                info "retrying to send message #{options[:status]} to node #{n}"
+                controller.configure(state: {node: n.to_sym, status: options[:status].to_sym})
+              end
+            else
+              error m.read_content('reason') if m.read_content("itype") == 'ERROR'
+              comm.disconnect
+            end
           when 'WARN'
             warn m.read_content('reason') if m.read_content("itype") == 'WARN'
           end

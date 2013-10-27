@@ -15,8 +15,8 @@ module OmfRc::ResourceProxy::CMFactory
   property :node_state
 
   hook :before_ready do |res|
-    @config = YAML.load_file('../etc/configuration.yaml')
-    @domain = @config[:domain]
+    #@config = YAML.load_file('../etc/proxies_conf.yaml')
+    #@domain = @config[:domain]
 #   ->before integrating with Broker, this was the way we took ip's for the nodes
 #     @nodes = @config[:nodes]
 #     puts "### nodes: #{@nodes}"
@@ -41,7 +41,7 @@ module OmfRc::ResourceProxy::CMFactory
 #       res.inform(:status, {
 #         event_type: "EXIT",
 #         exit_code: "-1",
-#         node: value[:node],
+#         node_name: value[:node],
 #         msg: "Wrong node name."
 #       }, :ALL)
 #     else
@@ -56,10 +56,10 @@ module OmfRc::ResourceProxy::CMFactory
       acc = res.find_account_name(res)
       if acc.nil?
         puts "error: acc nill"
-        res.inform(:status, {
-          event_type: "EXIT",
+        res.inform(:error, {
+          event_type: "ACCOUNT",
           exit_code: "-1",
-          node: value[:node],
+          node_name: value[:node],
           msg: "Wrong account name."
         }, :ALL)
         next
@@ -77,10 +77,10 @@ module OmfRc::ResourceProxy::CMFactory
 
         if node.nil?
           puts "error: Node nill"
-          client.inform(:status, {
-            event_type: "EXIT",
+          res.inform(:error, {
+            event_type: "NODE",
             exit_code: "-1",
-            node: value[:node],
+            node_name: value[:node],
             msg: "Wrong node name."
           }, :ALL)
           next
@@ -101,10 +101,10 @@ module OmfRc::ResourceProxy::CMFactory
 
             if lease.nil? #if lease is nil it means no matching lease is found
               puts "error: Lease nill"
-              client.inform(:status, {
-                event_type: "EXIT",
+              res.inform(:error, {
+                event_type: "LEASE",
                 exit_code: "-1",
-                node: value[:node],
+                node_name: value[:node],
                 msg: "Node is not leased by your account."
               }, :ALL)
               next
@@ -216,7 +216,17 @@ module OmfRc::ResourceProxy::CMFactory
 
   work("status") do |res, node|
     puts "http://#{node[:node_cm_ip].to_s}/state"
-    doc = Nokogiri::XML(open("http://#{node[:node_cm_ip].to_s}/state"))
+    begin
+      doc = Nokogiri::XML(open("http://#{node[:node_cm_ip].to_s}/state"))
+    rescue
+      res.inform(:error, {
+        event_type: "HTTP",
+        exit_code: "-1",
+        node_name: "#{node[:node_name].to_s}",
+        msg: "failed to reach cm, ip: #{node[:node_cm_ip].to_s}."
+      }, :ALL)
+      next
+    end
     puts doc
 
     res.inform(:status, {
@@ -229,7 +239,17 @@ module OmfRc::ResourceProxy::CMFactory
 
   work("start_node") do |res, node|
     puts "http://#{node[:node_cm_ip].to_s}/on"
-    doc = Nokogiri::XML(open("http://#{node[:node_cm_ip].to_s}/on"))
+    begin
+      doc = Nokogiri::XML(open("http://#{node[:node_cm_ip].to_s}/on"))
+    rescue
+      res.inform(:error, {
+        event_type: "HTTP",
+        exit_code: "-1",
+        node_name: "#{node[:node_name].to_s}",
+        msg: "failed to reach cm, ip: #{node[:node_cm_ip].to_s}."
+      }, :ALL)
+      next
+    end
     puts doc
     res.inform(:status, {
       event_type: "START_NODE",
@@ -257,7 +277,17 @@ module OmfRc::ResourceProxy::CMFactory
 
   work("stop_node") do |res, node|
     puts "http://#{node[:node_cm_ip].to_s}/off"
-    doc = Nokogiri::XML(open("http://#{node[:node_cm_ip].to_s}/off"))
+    begin
+      doc = Nokogiri::XML(open("http://#{node[:node_cm_ip].to_s}/off"))
+    rescue
+      res.inform(:error, {
+        event_type: "HTTP",
+        exit_code: "-1",
+        node_name: "#{node[:node_name].to_s}",
+        msg: "failed to reach cm, ip: #{node[:node_cm_ip].to_s}."
+      }, :ALL)
+      next
+    end
     puts doc
     res.inform(:status, {
       event_type: "STOP_NODE",
@@ -285,7 +315,17 @@ module OmfRc::ResourceProxy::CMFactory
 
   work("reset_node") do |res, node|
     puts "http://#{node[:node_cm_ip].to_s}/reset"
-    doc = Nokogiri::XML(open("http://#{node[:node_cm_ip].to_s}/reset"))
+    begin
+      doc = Nokogiri::XML(open("http://#{node[:node_cm_ip].to_s}/reset"))
+    rescue
+      res.inform(:error, {
+        event_type: "HTTP",
+        exit_code: "-1",
+        node_name: "#{node[:node_name].to_s}",
+        msg: "failed to reach cm, ip: #{node[:node_cm_ip].to_s}."
+      }, :ALL)
+      next
+    end
     puts doc
     res.inform(:status, {
       event_type: "RESET_NODE",
@@ -319,17 +359,47 @@ module OmfRc::ResourceProxy::CMFactory
         File.symlink("/tftpboot/pxelinux.cfg/omf-5.4", "#{symlink_name}")
       end
       puts "http://#{node[:node_cm_ip].to_s}/reset"
-      doc = Nokogiri::XML(open("http://#{node[:node_cm_ip].to_s}/reset"))
+      begin
+        doc = Nokogiri::XML(open("http://#{node[:node_cm_ip].to_s}/reset"))
+      rescue
+        res.inform(:error, {
+          event_type: "HTTP",
+          exit_code: "-1",
+          node_name: "#{node[:node_name].to_s}",
+          msg: "failed to reach cm, ip: #{node[:node_cm_ip].to_s}."
+        }, :ALL)
+        next
+      end
     elsif resp == :off
       symlink_name = "/tftpboot/pxelinux.cfg/01-#{node[:node_mac]}"
       if !File.exists?("#{symlink_name}")
         File.symlink("/tftpboot/pxelinux.cfg/omf-5.4", "#{symlink_name}")
       end
       puts "http://#{node[:node_cm_ip].to_s}/on"
-      doc = Nokogiri::XML(open("http://#{node[:node_cm_ip].to_s}/on"))
+      begin
+        doc = Nokogiri::XML(open("http://#{node[:node_cm_ip].to_s}/on"))
+      rescue
+        res.inform(:error, {
+          event_type: "HTTP",
+          exit_code: "-1",
+          node_name: "#{node[:node_name].to_s}",
+          msg: "failed to reach cm, ip: #{node[:node_cm_ip].to_s}."
+        }, :ALL)
+        next
+      end
     elsif resp == :started_on_pxe
       puts "http://#{node[:node_cm_ip].to_s}/reset"
-      doc = Nokogiri::XML(open("http://#{node[:node_cm_ip].to_s}/reset"))
+      begin
+        doc = Nokogiri::XML(open("http://#{node[:node_cm_ip].to_s}/reset"))
+      rescue
+        res.inform(:error, {
+          event_type: "HTTP",
+          exit_code: "-1",
+          node_name: "#{node[:node_name].to_s}",
+          msg: "failed to reach cm, ip: #{node[:node_cm_ip].to_s}."
+        }, :ALL)
+        next
+      end
     end
 
     if res.wait_until_ping(node[:node_ip])
@@ -356,7 +426,17 @@ module OmfRc::ResourceProxy::CMFactory
     end
     if action == "reset"
       puts "http://#{node[:node_cm_ip].to_s}/reset"
-      doc = Nokogiri::XML(open("http://#{node[:node_cm_ip].to_s}/reset"))
+      begin
+        doc = Nokogiri::XML(open("http://#{node[:node_cm_ip].to_s}/reset"))
+      rescue
+        res.inform(:error, {
+          event_type: "HTTP",
+          exit_code: "-1",
+          node_name: "#{node[:node_name].to_s}",
+          msg: "failed to reach cm, ip: #{node[:node_cm_ip].to_s}."
+        }, :ALL)
+        next
+      end
       puts doc
       t = 0
       if res.wait_until_ping(node[:node_ip])
@@ -376,7 +456,17 @@ module OmfRc::ResourceProxy::CMFactory
       end
     elsif action == "shutdown"
       puts "http://#{node[:node_cm_ip].to_s}/off"
-      doc = Nokogiri::XML(open("http://#{node[:node_cm_ip].to_s}/off"))
+      begin
+        doc = Nokogiri::XML(open("http://#{node[:node_cm_ip].to_s}/off"))
+      rescue
+        res.inform(:error, {
+          event_type: "HTTP",
+          exit_code: "-1",
+          node_name: "#{node[:node_name].to_s}",
+          msg: "failed to reach cm, ip: #{node[:node_cm_ip].to_s}."
+        }, :ALL)
+        next
+      end
       puts doc
       if res.wait_until_no_ping(node[:node_ip])
         res.inform(:status, {
