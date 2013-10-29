@@ -33,4 +33,12 @@ module OmfRc::ResourceProxy::UserFactory
     #puts "Returing #{res.property.users.to_s}"
     res.property.users
   end
+
+  configure :deluser do |res, value|
+    if res.property.users.include?(value[:username])
+      cmd = 'userdel -r ' + value[:username]
+      exec cmd
+      res.property.users.delete(value[:username])
+    end
+  end
 end
