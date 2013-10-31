@@ -121,9 +121,9 @@ module OmfRc::ResourceProxy::CMFactory
               end
 
               case value[:status].to_sym
-              when :on then res.start_node(nod)
-              when :off then res.stop_node(nod)
-              when :reset then res.reset_node(nod)
+              when :on then res.start_node(nod, value[:wait])
+              when :off then res.stop_node(nod, value[:wait])
+              when :reset then res.reset_node(nod, value[:wait])
               when :start_on_pxe then res.start_node_pxe(nod)
               when :start_without_pxe then res.start_node_pxe_off(nod, value[:last_action])
               when :get_status then res.status(nod)
@@ -237,7 +237,7 @@ module OmfRc::ResourceProxy::CMFactory
     }, :ALL)
   end
 
-  work("start_node") do |res, node|
+  work("start_node") do |res, node, wait|
     puts "http://#{node[:node_cm_ip].to_s}/on"
     begin
       doc = Nokogiri::XML(open("http://#{node[:node_cm_ip].to_s}/on"))
@@ -258,24 +258,26 @@ module OmfRc::ResourceProxy::CMFactory
       msg: "#{doc.xpath("//Response").text}"
     }, :ALL)
 
-    if res.wait_until_ping(node[:node_ip])
-      res.inform(:status, {
-        event_type: "EXIT",
-        exit_code: "0",
-        node_name: "#{node[:node_name].to_s}",
-        msg: "Node '#{node[:node_name].to_s}' is up."
-      }, :ALL)
-    else
-      res.inform(:error, {
-        event_type: "EXIT",
-        exit_code: "-1",
-        node_name: "#{node[:node_name].to_s}",
-        msg: "Node '#{node[:node_name].to_s}' timed out while booting."
-      }, :ALL)
+    if wait
+      if res.wait_until_ping(node[:node_ip])
+        res.inform(:status, {
+          event_type: "EXIT",
+          exit_code: "0",
+          node_name: "#{node[:node_name].to_s}",
+          msg: "Node '#{node[:node_name].to_s}' is up."
+        }, :ALL)
+      else
+        res.inform(:error, {
+          event_type: "EXIT",
+          exit_code: "-1",
+          node_name: "#{node[:node_name].to_s}",
+          msg: "Node '#{node[:node_name].to_s}' timed out while booting."
+        }, :ALL)
+      end
     end
   end
 
-  work("stop_node") do |res, node|
+  work("stop_node") do |res, node, wait|
     puts "http://#{node[:node_cm_ip].to_s}/off"
     begin
       doc = Nokogiri::XML(open("http://#{node[:node_cm_ip].to_s}/off"))
@@ -296,24 +298,26 @@ module OmfRc::ResourceProxy::CMFactory
       msg: "#{doc.xpath("//Response").text}"
     }, :ALL)
 
-    if res.wait_until_no_ping(node[:node_ip])
-      res.inform(:status, {
-        event_type: "EXIT",
-        exit_code: "0",
-        node_name: "#{node[:node_name].to_s}",
-        msg: "Node '#{node[:node_name].to_s}' is down."
-      }, :ALL)
-    else
-      res.inform(:error, {
-        event_type: "EXIT",
-        exit_code: "-1",
-        node_name: "#{node[:node_name].to_s}",
-        msg: "Node '#{node[:node_name].to_s}' timed out while shutting down."
-      }, :ALL)
+    if wait
+      if res.wait_until_no_ping(node[:node_ip])
+        res.inform(:status, {
+          event_type: "EXIT",
+          exit_code: "0",
+          node_name: "#{node[:node_name].to_s}",
+          msg: "Node '#{node[:node_name].to_s}' is down."
+        }, :ALL)
+      else
+        res.inform(:error, {
+          event_type: "EXIT",
+          exit_code: "-1",
+          node_name: "#{node[:node_name].to_s}",
+          msg: "Node '#{node[:node_name].to_s}' timed out while shutting down."
+        }, :ALL)
+      end
     end
   end
 
-  work("reset_node") do |res, node|
+  work("reset_node") do |res, node, wait|
     puts "http://#{node[:node_cm_ip].to_s}/reset"
     begin
       doc = Nokogiri::XML(open("http://#{node[:node_cm_ip].to_s}/reset"))
@@ -333,21 +337,23 @@ module OmfRc::ResourceProxy::CMFactory
       node_name: "#{node[:node_name].to_s}",
       msg: "#{doc.xpath("//Response").text}"
     }, :ALL)
-
-    if res.wait_until_ping(node[:node_ip])
-      res.inform(:status, {
-        event_type: "EXIT",
-        exit_code: "0",
-        node_name: "#{node[:node_name].to_s}",
-        msg: "Node '#{node[:node_name].to_s}' is up after reset."
-      }, :ALL)
-    else
-      res.inform(:error, {
-        event_type: "EXIT",
-        exit_code: "-1",
-        node_name: "#{node[:node_name].to_s}",
-        msg: "Node '#{node[:node_name].to_s}' timed out while reseting."
-      }, :ALL)
+    
+    if wait
+      if res.wait_until_ping(node[:node_ip])
+        res.inform(:status, {
+          event_type: "EXIT",
+          exit_code: "0",
+          node_name: "#{node[:node_name].to_s}",
+          msg: "Node '#{node[:node_name].to_s}' is up after reset."
+        }, :ALL)
+      else
+        res.inform(:error, {
+          event_type: "EXIT",
+          exit_code: "-1",
+          node_name: "#{node[:node_name].to_s}",
+          msg: "Node '#{node[:node_name].to_s}' timed out while reseting."
+        }, :ALL)
+      end
     end
   end
 

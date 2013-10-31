@@ -19,13 +19,15 @@ opt_parser = OptionParser.new do |opts|
   opts.separator  "     stat : report the status of a group of nodes"
   opts.separator "Options"
 
-  opts.on('-i', '--image IMAGE_NAME', 'the image name for save command') { |v| options[:image] = v }
+  opts.on('-i', '--image IMAGE_NAME', 'the image name for load command') { |v| options[:image] = v }
   opts.on('-n', '--node NODE', 'node name for save command') { |v| options[:node] = v }
   opts.on('-a', '--status STATUS', 'the status you want to get the node to. Required only on tell command.') { |v| options[:status] = v }
   opts.on('-t', '--target_nodes NODES', 'target nodes you want to run the command too. Required on commands load, tell and stat.') {|v| options[:target_nodes] = v.split(",") }
 
   options[:last_action] = "reset" #actions are reset and shutdown
   opts.on('-l', '--last_action ACTION', "action you want to perform after the commands is executed. Optional on commands load and save (last_action can be reset/shutdown. Default #{options[:last_action]})."){|v| options[:last_action] = v}
+  options[:wait] = false
+  opts.on('-w', '--wait', 'wait until pingable. Used in tell command (default vallue is off)'){|v| options[:wait] = true}
 end
 
 #run frisbee server
@@ -358,8 +360,17 @@ def tell(comm, options)
           when 'STATUS'
             if m.read_property("event_type") == "STOP_NODE" ||  m.read_property("event_type") == "START_NODE" ||m.read_property("event_type") == "RESET_NODE"
               puts "CM card response: #{m.read_property("msg")}"
-              puts "Wating for node responce."
-              logger.info "#{m.read_property("msg")}, exit code: #{m.read_property("exit_code")}"
+              if options[:wait]
+                puts "Waiting for node responce."
+                logger.info "#{m.read_property("msg")}, exit code: #{m.read_property("exit_code")}"
+              else
+                n = m.read_property("node_name")
+                nodes_ok << n
+                if (nodes_ok.length + nodes_failed.length) == options[:target_nodes].length
+                  "all nodes "
+                  comm.disconnect
+                end
+              end
             elsif m.read_property("event_type") == "EXIT"
               puts "#{m.read_property("node_name")}: #{m.read_property("msg")}"
               logger.info "#{m.read_property("msg")}, exit code: #{m.read_property("exit_code")}"
@@ -413,15 +424,15 @@ def tell(comm, options)
       end
       if options[:status] == "on"
         options[:target_nodes].each do |node|
-          controller.configure(state: {node: node.to_sym, status: :on})
+          controller.configure(state: {node: node.to_sym, status: :on, wait: options[:wait]})
         end
       elsif options[:status] == "off"
         options[:target_nodes].each do |node|
-          controller.configure(state: {node: node.to_sym, status: :off})
+          controller.configure(state: {node: node.to_sym, status: :off, wait: options[:wait]})
         end
       elsif options[:status] == "reset"
         options[:target_nodes].each do |node|
-          controller.configure(state: {node: node.to_sym, status: :reset})
+          controller.configure(state: {node: node.to_sym, status: :reset, wait: options[:wait]})
         end
       else
         puts "Invalid value for -a, only on/off/reset values are available."

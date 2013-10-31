@@ -40,7 +40,7 @@ opts = {
   }
 }
 
-class TestPDP
+class MyPDP
   def initialize(opts = {})
     @trust = opts[:trust] || []
     puts "AUTH INIT>>> #{opts}"
@@ -54,6 +54,7 @@ class TestPDP
 #     else
 #       puts "AUTH(#{iss}) >>> FAILED"
 #     end
+    puts "AUTH(#{iss}) >>> PASS"
     msg
   end
 end
