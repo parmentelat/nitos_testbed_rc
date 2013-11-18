@@ -4,8 +4,8 @@
   :server: testserver
 :auth:
   :root_cert_dir: ~/.omf/trusted_roots
-  :entity_cert: ~/.omf/urc.pem
-  :entity_key: ~/.omf/user_rc_key.pem
+  :entity_cert: ~/.omf/user_cert.pem
+  :entity_key: ~/.omf/user_cert.pkey
 :domain:
   :ip: 10.0.0.
 :nodes:

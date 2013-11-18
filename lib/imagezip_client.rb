@@ -24,24 +24,6 @@ module OmfRc::ResourceProxy::ImagezipClient #Imagezip client
   property :node_topic
 
   hook :after_initial_configured do |client|
-#     node = nil
-#     $all_nodes.each do |n|
-#       if n[:node_name] == client.property.node_topic.to_sym
-#         node = n
-#       end
-#     end
-#     puts "Node : #{node}"
-#     if node.nil?
-#       puts "error: Node nill"
-#       client.inform(:status, {
-#         event_type: "EXIT",
-#         exit_code: "-1",
-#         msg: "Wrong node name."
-#       }, :ALL)
-#       client.release
-#       return
-#     end
-
     OmfCommon.comm.subscribe("am_controller") do |am_con|
       acc = client.find_account_name(client)
       if acc.nil?

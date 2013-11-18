@@ -11,19 +11,10 @@ module OmfRc::ResourceProxy::CMFactory
 
   register_proxy :cm_factory
 
-#   property :all_nodes, :default => []
   property :node_state
 
   hook :before_ready do |res|
-    #@config = YAML.load_file('../etc/proxies_conf.yaml')
-    #@domain = @config[:domain]
-#   ->before integrating with Broker, this was the way we took ip's for the nodes
-#     @nodes = @config[:nodes]
-#     puts "### nodes: #{@nodes}"
-#     @nodes.each do |node|
-#       tmp = {node_name: node[0], node_ip: node[1][:ip], node_mac: node[1][:mac], node_cm_ip: node[1][:cm_ip]}
-#       res.property.all_nodes << tmp
-#     end
+
   end
 
 #   request :node_state do |res|
@@ -51,7 +42,6 @@ module OmfRc::ResourceProxy::CMFactory
 #   end
 
   configure :state do |res, value|
-
     OmfCommon.comm.subscribe("am_controller") do |am_con|
       acc = res.find_account_name(res)
       if acc.nil?
@@ -144,19 +134,6 @@ module OmfRc::ResourceProxy::CMFactory
     acc_name
   end
 
-#   work("get_node") do |res, node_name|
-#     OmfCommon.comm.subscribe("am_controller") do |res|
-#       res.request([:nodes]) do |msg|
-#         node = msg.read_property("node")
-#         puts "+++++++++++++ #{node}"
-#       end
-#     end
-#   end
-#
-#   work("check_lease") do |res, node, account|
-#
-#   end
-
   work("wait_until_ping") do |res, ip|
     t = 0
     resp = false
@@ -230,10 +207,8 @@ module OmfRc::ResourceProxy::CMFactory
     puts doc
 
     res.inform(:status, {
-      event_type: "NODE_STATUS",
-      exit_code: "0",
-      node_name: "#{node[:node_name].to_s}",
-      msg: "#{doc.xpath("//Measurement//type//value").text}"
+      current: "#{doc.xpath("//Measurement//type//value").text}",
+      node_name: "#{node[:node_name].to_s}"
     }, :ALL)
   end
 
@@ -251,24 +226,24 @@ module OmfRc::ResourceProxy::CMFactory
       next
     end
     puts doc
-    res.inform(:status, {
-      event_type: "START_NODE",
-      exit_code: "0",
-      node_name: "#{node[:node_name].to_s}",
-      msg: "#{doc.xpath("//Response").text}"
-    }, :ALL)
+    if doc.xpath("//Response").text == 'ok'
+      res.inform(:status, {
+        node_name: "#{node[:node_name].to_s}",
+        current: :booting,
+        desired: :running
+      }, :ALL)
+    end
 
     if wait
       if res.wait_until_ping(node[:node_ip])
         res.inform(:status, {
-          event_type: "EXIT",
-          exit_code: "0",
           node_name: "#{node[:node_name].to_s}",
-          msg: "Node '#{node[:node_name].to_s}' is up."
+          current: :running,
+          desired: :running
         }, :ALL)
       else
         res.inform(:error, {
-          event_type: "EXIT",
+          event_type: "TIME_OUT",
           exit_code: "-1",
           node_name: "#{node[:node_name].to_s}",
           msg: "Node '#{node[:node_name].to_s}' timed out while booting."
@@ -291,24 +266,24 @@ module OmfRc::ResourceProxy::CMFactory
       next
     end
     puts doc
-    res.inform(:status, {
-      event_type: "STOP_NODE",
-      exit_code: "0",
-      node_name: "#{node[:node_name].to_s}",
-      msg: "#{doc.xpath("//Response").text}"
-    }, :ALL)
+    if doc.xpath("//Response").text == 'ok'
+      res.inform(:status, {
+          node_name: "#{node[:node_name].to_s}",
+          current: :running,
+          desired: :stopped
+      }, :ALL)
+    end
 
     if wait
       if res.wait_until_no_ping(node[:node_ip])
         res.inform(:status, {
-          event_type: "EXIT",
-          exit_code: "0",
           node_name: "#{node[:node_name].to_s}",
-          msg: "Node '#{node[:node_name].to_s}' is down."
+          current: :stopped,
+          desired: :stopped
         }, :ALL)
       else
         res.inform(:error, {
-          event_type: "EXIT",
+          event_type: "TIME_OUT",
           exit_code: "-1",
           node_name: "#{node[:node_name].to_s}",
           msg: "Node '#{node[:node_name].to_s}' timed out while shutting down."
@@ -331,24 +306,24 @@ module OmfRc::ResourceProxy::CMFactory
       next
     end
     puts doc
-    res.inform(:status, {
-      event_type: "RESET_NODE",
-      exit_code: "0",
-      node_name: "#{node[:node_name].to_s}",
-      msg: "#{doc.xpath("//Response").text}"
-    }, :ALL)
-    
+     if doc.xpath("//Response").text == 'ok'
+      res.inform(:status, {
+          node_name: "#{node[:node_name].to_s}",
+          current: :running,
+          desired: :resetted
+      }, :ALL)
+    end
+
     if wait
       if res.wait_until_ping(node[:node_ip])
         res.inform(:status, {
-          event_type: "EXIT",
-          exit_code: "0",
-          node_name: "#{node[:node_name].to_s}",
-          msg: "Node '#{node[:node_name].to_s}' is up after reset."
+            node_name: "#{node[:node_name].to_s}",
+            current: :resetted,
+            desired: :resetted
         }, :ALL)
       else
         res.inform(:error, {
-          event_type: "EXIT",
+          event_type: "TIME_OUT",
           exit_code: "-1",
           node_name: "#{node[:node_name].to_s}",
           msg: "Node '#{node[:node_name].to_s}' timed out while reseting."
@@ -410,14 +385,13 @@ module OmfRc::ResourceProxy::CMFactory
 
     if res.wait_until_ping(node[:node_ip])
       res.inform(:status, {
-        event_type: "PXE",
-        exit_code: "0",
         node_name: "#{node[:node_name].to_s}",
-        msg: "Node '#{node[:node_name].to_s}' is up on PXE."
+        current: :pxe_on,
+        desired: :pxe_on
       }, :ALL)
     else
       res.inform(:error, {
-        event_type: "PXE",
+        event_type: "TIME_OUT",
         exit_code: "-1",
         node_name: "#{node[:node_name].to_s}",
         msg: "Node '#{node[:node_name].to_s}' timed out while trying to boot on PXE."
@@ -447,10 +421,9 @@ module OmfRc::ResourceProxy::CMFactory
       t = 0
       if res.wait_until_ping(node[:node_ip])
         res.inform(:status, {
-          event_type: "PXE_OFF",
-          exit_code: "0",
           node_name: "#{node[:node_name].to_s}",
-          msg: "Node '#{node[:node_name].to_s}' is up."
+          current: :pxe_off,
+          desired: :pxe_off
         }, :ALL)
       else
         res.inform(:error, {
@@ -473,17 +446,17 @@ module OmfRc::ResourceProxy::CMFactory
         }, :ALL)
         next
       end
+
       puts doc
       if res.wait_until_no_ping(node[:node_ip])
         res.inform(:status, {
-          event_type: "EXIT",
-          exit_code: "0",
           node_name: "#{node[:node_name].to_s}",
-          msg: "Node '#{node[:node_name].to_s}' is down."
+          current: :pxe_off,
+          desired: :pxe_off
         }, :ALL)
       else
         res.inform(:error, {
-          event_type: "EXIT",
+          event_type: "TIME_OUT",
           exit_code: "-1",
           node_name: "#{node[:node_name].to_s}",
           msg: "Node '#{node[:node_name].to_s}' timed out while shutting down."
@@ -492,22 +465,3 @@ module OmfRc::ResourceProxy::CMFactory
     end
   end
 end
-#
-#
-# entity_cert = File.expand_path(@auth[:entity_cert])
-# entity_key = File.expand_path(@auth[:entity_key])
-# entity = OmfCommon::Auth::Certificate.create_from_x509(File.read(entity_cert), File.read(entity_key))
-#
-# trusted_roots = File.expand_path(@auth[:root_cert_dir])
-#
-# OmfCommon.init(:development, communication: { url: "xmpp://#{@xmpp[:username]}:#{@xmpp[:password]}@#{@xmpp[:server]}", auth: {} }) do
-#   OmfCommon.comm.on_connected do |comm|
-#     OmfCommon::Auth::CertificateStore.instance.register_default_certs(trusted_roots)
-#     OmfCommon::Auth::CertificateStore.instance.register(entity, OmfCommon.comm.local_topic.address)
-#     OmfCommon::Auth::CertificateStore.instance.register(entity)
-#
-#     info "CMController >> Connected to XMPP server"
-#     cmContr = OmfRc::ResourceFactory.create(:cmController, { uid: 'cmController', certificate: entity })
-#     comm.on_interrupted { cmContr.disconnect }
-#   end
-# end
