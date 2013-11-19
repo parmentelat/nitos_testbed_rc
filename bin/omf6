@@ -33,6 +33,9 @@ end
 entity_cert = File.expand_path(@auth[:entity_cert])
 entity_key = File.expand_path(@auth[:entity_key])
 @entity = OmfCommon::Auth::Certificate.create_from_x509(File.read(entity_cert), File.read(entity_key))
+frisbee_entity_cert = File.expand_path("~/.omf/frisbee_factory.pem")
+frisbee_entity_key = File.expand_path("~/.omf/frisbee_factory.pkey")
+frisbee_entity = OmfCommon::Auth::Certificate.create_from_x509(File.read(frisbee_entity_cert), File.read(frisbee_entity_key))
 
 trusted_roots = File.expand_path(@auth[:root_cert_dir])
 
@@ -78,14 +81,13 @@ def create_frisbee(comm, fcontroller, node, port, options)
               puts "#{client_msg.read_property("node")}: #{client_msg.read_property("msg")}"
             elsif client_msg.read_property("event") == "EXIT"
               puts "#{client_msg.read_property("node")}: #{client_msg.read_property("msg")}"
-              comm.subscribe('cm_factory', { uid: 'omf6_script', certificate: @entity }) do |controller|
+              comm.subscribe('cm_factory') do |controller|
                 controller.on_message do |cm_msg|
                   if cm_msg.operation == :inform
                     case cm_msg.read_content("itype")
                     when 'STATUS'
-                      unless m.read_property("current").nil? || m.read_property("desired").nil?
+                      unless cm_msg.read_property("current").nil? || cm_msg.read_property("desired").nil?
                         if cm_msg.read_property("current").to_sym == :pxe_off && cm_msg.read_property("desired").to_sym == :pxe_off
-                          puts "#{options[:last_action]} node '#{cm_msg.read_property("node_name")}' out of PXE."
                           n = cm_msg.read_property("node")
                           @nodes_up_without_pxe << n
                           if @nodes_up_pxe.length == (@nodes_up_without_pxe.length + @nodes_failed_without_pxe.length)
@@ -150,11 +152,11 @@ def create_frisbee(comm, fcontroller, node, port, options)
                         error cm_msg.read_content('reason') if cm_msg.read_content("reason")
                       end
                     when 'WARN'
-                      warn cm_msg.read_content('reason') if m.read_content("reason")
+                      warn cm_msg.read_content('reason') if cm_msg.read_content("reason")
                     end
                   end
                 end
-                puts "#{options[:last_action]} node '#{client_msg.read_property("node_name")}' out of PXE."
+                puts "#{options[:last_action]} node '#{client_msg.read_property("node")}' out of PXE."
                 controller.configure(state: {node: node.to_sym, status: :start_without_pxe, last_action: options[:last_action]})
               end
             end
@@ -168,7 +170,7 @@ def create_frisbee(comm, fcontroller, node, port, options)
 end
 
 def load(comm, options)
-  comm.subscribe('cm_factory', { uid: 'omf6_script', certificate: @entity }) do |controller|
+  comm.subscribe('cm_factory') do |controller|
     #TODO handle the case some nodes are not up and running
     unless controller.error?
       @nof_nodes = options[:target_nodes].length
@@ -301,7 +303,7 @@ end
 
 #run imagezip server
 def create_imagezip_server(comm, fcontroller, port, options)
-  fcontroller.create(:imagezip_server, {hrn: 'imagezip server', image: options[:image], port: port, uid: 'root', certificate: @entity}) do |reply_msg|
+  fcontroller.create(:imagezip_server, {hrn: 'imagezip server', image: options[:image], port: port}) do |reply_msg|
     #image "/var/lib/omf-images-5.4/baseline.ndz"
     if reply_msg.success?
       server = reply_msg.resource
@@ -325,7 +327,7 @@ end
 
 #run imagezip client on a node
 def create_imagezip_client(comm, fcontroller, node, port, options)
-  fcontroller.create(:imagezip_client, hrn: 'imagezip client', port: port, node_topic: "#{node.to_s}", certificate: @entity) do |reply_msg|
+  fcontroller.create(:imagezip_client, {hrn: 'imagezip client', port: port, node_topic: "#{node.to_s}"}) do |reply_msg|
     if reply_msg.success?
       client = reply_msg.resource
       client.on_subscribed do
@@ -335,7 +337,7 @@ def create_imagezip_client(comm, fcontroller, node, port, options)
               print "#{client_msg.read_property("msg")}"
             elsif client_msg.read_property("event") == "EXIT"
               puts "#{client_msg.read_property("node")}: #{client_msg.read_property("msg")}"
-              comm.subscribe('cm_factory', { uid: 'omf6_script', certificate: @entity }) do |controller|
+              comm.subscribe('cm_factory') do |controller|
                 controller.on_message do |cm_msg|
                   if cm_msg.operation == :inform
                     case cm_msg.read_content("itype")
@@ -352,26 +354,32 @@ def create_imagezip_client(comm, fcontroller, node, port, options)
                       case cm_msg.read_property("event_type")
                       when "ACCOUNT"
                         logger.info "#{cm_msg.read_property("msg")}, exit code: #{cm_msg.read_property("exit_code")}"
-                        comm.disconnect
+                        fcontroller.release(@@server) do |reply_msg|
+                          comm.disconnect
+                        end
                       when "NODE"
                         logger.info "#{cm_msg.read_property("msg")}, exit code: #{cm_msg.read_property("exit_code")}"
-                        comm.disconnect
+                        fcontroller.release(@@server) do |reply_msg|
+                          comm.disconnect
+                        end
                       when "LEASE"
                         logger.info "#{cm_msg.read_property("msg")}, exit code: #{cm_msg.read_property("exit_code")}"
-                        comm.disconnect
+                        fcontroller.release(@@server) do |reply_msg|
+                          comm.disconnect
+                        end
                       when "HTTP"
                         logger.info "#{cm_msg.read_property("msg")}, exit code: #{cm_msg.read_property("exit_code")}"
                         if @retried
-                          comm.disconnect
+                          fcontroller.release(@@server) do |reply_msg|
+                            comm.disconnect
+                          end
                         else
                           @retried = true
                           controller.configure(state: {node: node.to_sym, status: :start_without_pxe, last_action: options[:last_action]})
                         end
                       when "TIME_OUT"
                         logger.info "#{cm_msg.read_property("msg")}, exit code: #{cm_msg.read_property("exit_code")}"
-                        n = cm_msg.read_property("node_name")
-                        nodes_failed_pxe << n
-                        if (@nodes_up_pxe.length + nodes_failed_failed.length) == options[:target_nodes].length
+                        fcontroller.release(@@server) do |reply_msg|
                           comm.disconnect
                         end
                       else
@@ -464,7 +472,7 @@ def save(comm, options)
 end
 
 def tell(comm, options)
-  comm.subscribe('cm_factory', { uid: 'omf6_script', certificate: @entity }) do |controller|
+  comm.subscribe('cm_factory') do |controller|
     unless controller.error?
       nodes_failed = []
       nodes_ok = []
@@ -577,7 +585,7 @@ def tell(comm, options)
 end
 
 def stat(comm, options)
-  comm.subscribe('cm_factory', { uid: 'omf6_script', certificate: @entity }) do |controller|
+  comm.subscribe('cm_factory') do |controller|
     unless controller.error?
       nodes_failed = []
       nodes_ok = []
@@ -670,7 +678,10 @@ OmfCommon.init(:development, communication: { url: "xmpp://#{@xmpp[:script_user]
     OmfCommon::Auth::CertificateStore.instance.register_default_certs(trusted_roots)
 #     OmfCommon::Auth::CertificateStore.instance.register_with_address(@entity, OmfCommon.comm.local_topic.address)
     OmfCommon::Auth::CertificateStore.instance.register(@entity, OmfCommon.comm.local_topic.address)
+    OmfCommon::Auth::CertificateStore.instance.register(frisbee_entity)
     OmfCommon::Auth::CertificateStore.instance.register(@entity)
+    OmfCommon::Auth::CertificateStore.instance.register_trusted(frisbee_entity)
+    OmfCommon::Auth::CertificateStore.instance.register_trusted(@entity)
 
     info "Test script >> Connected to XMPP"
 
