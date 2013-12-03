@@ -1,0 +1,12 @@
+#xmpp details
+:xmpp:
+  :username: user_proxy
+  :password: pw
+  :server: testserver
+#x509 certificates to be used by user_proxy
+:auth:
+  :root_cert_dir: ~/.omf/trusted_roots
+  :entity_cert: ~/.omf/user_factory.pem
+  :entity_key: ~/.omf/user_factory.pkey
+#operation Mode for OmfCommon.init (development, production, etc)
+:operationMode: development

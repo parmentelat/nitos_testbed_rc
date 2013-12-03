@@ -1,0 +1,41 @@
+#xmpp details
+:xmpp:
+  :username: frisbee_proxy
+  :password: pw
+  :server: testserver
+#x509 certificates to be used by user_proxy
+:auth:
+  :root_cert_dir: ~/.omf/trusted_roots
+  :entity_cert: ~/.omf/frisbee_factory.pem
+  :entity_key: ~/.omf/frisbee_factory.pkey
+
+#operation Mode for OmfCommon.init (development, production, etc)
+:operationMode: development
+
+:frisbee:
+  # Directory images are stored
+  :imageDir: /var/lib/omf-images-6
+  #defaultImage: orbit-baseline
+  :defaultImage: baseline.ndz
+
+  # max bandwidth for frisbee server
+  :bandwidth: 50000000
+
+  # Multicast address to use for servicing images
+  #mcAddress: 224.0.0.2
+  :mcAddress: 224.0.0.1
+  # Using ports starting at ...
+  :startPort: 7000
+
+  # Time out frisbee server if nobody requested it within TIMEOUT sec
+  :timeout: 3600
+
+  # Directory to find frisbee daemons
+  :frisbeedBin: /usr/sbin/frisbeed
+  :frisbeeBin: /usr/sbin/frisbee
+  :imagezipClientBin: /usr/bin/imagezip
+  :imagezipServerBin: /bin/nc
+
+  # Local interface to bind to for frisbee traffic
+  #multicastIF: 192.168.204.1
+  :multicastIF: 10.0.0.200

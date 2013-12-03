@@ -1,0 +1,15 @@
+#details to be used for the connection to the xmpp server
+:xmpp:
+  :username: cm_proxy
+  :password: pw
+  :server: testserver
+#x509 certificates to be used by cm_proxy
+:auth:
+  :root_cert_dir: ~/.omf/trusted_roots
+  :entity_cert: ~/.omf/cm_factory.pem
+  :entity_key: ~/.omf/cm_factory.pkey
+
+#time (in seconds) before timeout error occurs
+:timeout: 80
+#operation Mode for OmfCommon.init (development, production, etc)
+:operationMode: development
