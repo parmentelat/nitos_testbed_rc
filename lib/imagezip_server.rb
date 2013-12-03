@@ -4,8 +4,10 @@
 
 module OmfRc::ResourceProxy::ImagezipServer #Imagezip server
   include OmfRc::ResourceProxyDSL
-
   require 'omf_common/exec_app'
+
+  @config = YAML.load_file('../etc/frisbee_proxy_conf.yaml')
+  @fconf = @config[:frisbee]
 
   register_proxy :imagezip_server, :create_by => :frisbee_factory
 
@@ -13,16 +15,15 @@ module OmfRc::ResourceProxy::ImagezipServer #Imagezip server
   utility :platform_tools
 
   property :app_id, :default => nil
-  property :binary_path, :default => '/bin/nc'
+  property :binary_path, :default => @fconf[:imagezipServerBin] #usualy '/bin/nc'
   property :map_err_to_out, :default => false
 
-  property :ip, :default => "#{$domain}200"
-  property :port, :default => "9000"
-  property :image_name, :default => "/tmp/image.ndz"
+  property :ip, :default => @fconf[:multicastIF]
+  property :port
+  property :image_name, :default => @fconf[:imageDir] + '/new_image.ndz'
 
   hook :after_initial_configured do |server|
     server.property.app_id = server.hrn.nil? ? server.uid : server.hrn
-    server.property.multicast_interface = "#{$domain}200"
 
     @app = ExecApp.new(server.property.app_id, server.build_command_line, server.property.map_err_to_out) do |event_type, app_id, msg|
       server.process_event(server, event_type, app_id, msg)
@@ -30,9 +31,7 @@ module OmfRc::ResourceProxy::ImagezipServer #Imagezip server
   end
 
   hook :before_release do |server|
-    #not needed, stops by default
-    #@app.signal(signal = 'KILL')
-    $ports.delete_if {|x| x == server.property.port}
+    $ports.delete_if {|x| x == server.property.port} #ports is in frisbee_factory
   end
 
   def process_event(res, event_type, app_id, msg)

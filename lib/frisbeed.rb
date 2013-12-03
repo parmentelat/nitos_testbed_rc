@@ -6,8 +6,10 @@
 
 module OmfRc::ResourceProxy::Frisbeed
   include OmfRc::ResourceProxyDSL
-
   require 'omf_common/exec_app'
+
+  @config = YAML.load_file('../etc/frisbee_proxy_conf.yaml')
+  @fconf = @config[:frisbee]
 
   register_proxy :frisbeed, :create_by => :frisbee_factory
 
@@ -15,18 +17,19 @@ module OmfRc::ResourceProxy::Frisbeed
   utility :platform_tools
 
   property :app_id, :default => nil
-  property :binary_path, :default => '/usr/sbin/frisbeed'
+  property :binary_path, :default => @fconf[:frisbeedBin]                 #binary path to frisbeed '/usr/sbin/frisbeed'
   property :map_err_to_out, :default => false
 
-  property :multicast_interface, :default => "#{$domain}200" #multicast interface, example 10.0.0.200 (-i arguement)
-  property :multicast_address, :default => "224.0.0.1"        #multicast address, example 224.0.0.1 (-m arguement)
-  property :port                                              #port, example 7000 (-p arguement)
-  property :speed, :default => 50000000                       #bandwidth speed in bits/sec, example 50000000 (-W arguement)
-  property :image                                             #image to burn, example /var/lib/omf-images-5.4/baseline.ndz (no arguement)
+  property :multicast_interface, :default => @fconf[:multicastIF]         #multicast interface, example 10.0.0.200 (-i arguement)
+  property :multicast_address, :default => @fconf[:mcAddress]             #multicast address, example 224.0.0.1 (-m arguement)
+  property :port                                                          #port, example 7000 (-p arguement)
+  property :speed, :default => @fconf[:bandwidth]                         #bandwidth speed in bits/sec, example 50000000 (-W arguement)
+  property :image, :default => @fconf[:imageDir] + @fconf[:defaultImage]  #image to burn, example /var/lib/omf-images-5.4/baseline.ndz
 
-   hook :after_initial_configured do |server|
+
+
+  hook :after_initial_configured do |server|
     server.property.app_id = server.hrn.nil? ? server.uid : server.hrn
-    server.property.multicast_interface = "#{$domain}200"
 
     @app = ExecApp.new(server.property.app_id, server.build_command_line, server.property.map_err_to_out) do |event_type, app_id, msg|
       server.process_event(server, event_type, app_id, msg)
@@ -34,8 +37,13 @@ module OmfRc::ResourceProxy::Frisbeed
   end
 
   hook :before_release do |server|
-    @app.signal(signal = 'KILL')
-    $ports.delete_if {|x| x == server.property.port}
+    begin
+      @app.signal(signal = 'KILL')
+    rescue Exception => e
+      raise e unless e.message == "No such process"
+    ensure
+     $ports.delete_if {|x| x == server.property.port}
+    end
   end
 
   # This method processes an event coming from the application instance, which
