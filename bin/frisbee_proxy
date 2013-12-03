@@ -1,0 +1,153 @@
+#!/usr/bin/env ruby
+
+require 'omf_rc'
+require 'omf_common'
+require 'yaml'
+
+$stdout.sync = true
+
+@config = YAML.load_file('../etc/frisbee_proxy_conf.yaml')
+@auth = @config[:auth]
+@xmpp = @config[:xmpp]
+
+require '../lib/frisbee'
+require '../lib/frisbeed'
+require '../lib/imagezip_server'
+require '../lib/imagezip_client'
+require '../lib/frisbee_factory'
+
+frisbee_entity_cert = File.expand_path(@auth[:entity_cert])
+frisbee_entity_key = File.expand_path(@auth[:entity_key])
+frisbee_entity = OmfCommon::Auth::Certificate.create_from_pem(File.read(frisbee_entity_cert))#, File.read(frisbee_entity_key))
+
+trusted_roots = File.expand_path(@auth[:root_cert_dir])
+
+opts = {
+  communication: {
+    url:  "xmpp://#{@xmpp[:username]}:#{@xmpp[:password]}@#{@xmpp[:server]}",
+    auth: {
+      authenticate: true,
+      pdp: {
+        constructor: 'FrisbeePDP'
+      }
+    }
+  }
+}
+
+class FrisbeePDP
+  def initialize(opts = {})
+    debug "AUTH INIT>>> #{opts}"
+  end
+
+  def authorize(msg, &block)
+    debug "AUTH message received: #{msg.operation}"
+    if msg.operation.to_sym == :create
+      if msg.rtype.to_sym == :frisbee || msg.rtype.to_sym == :imagezip_client
+        wait = true
+        result = nil
+        OmfCommon.comm.subscribe("am_controller") do |am_con|
+          acc = _get_account_name(msg)
+
+          if acc.nil?
+            error "AUTH error: acc nill"
+            msg.propertie.error_msg = "Account name not found"
+            result = msg
+            wait = false
+            next
+          end
+
+          node_name = msg.properties.node_topic
+          am_con.request([:nodes]) do |n_msg|
+            nodes = n_msg.read_property("nodes")[:resources]
+            node = nil
+            nodes.each do |n|
+              if n[:resource][:name].to_s == node_name.to_s
+                node = n
+                break
+              end
+            end
+
+            lease = nil
+            if node.nil?
+              error "AUTH error: Node nill"
+              msg.properties.error_msg = "Wrong node name."
+              result = msg
+              wait = false
+              next
+            else
+              am_con.request([:leases]) do |l_msg|
+                leases = l_msg.read_property("leases")[:resources]
+                leases.each do |l|
+                  if Time.parse(l[:resource][:valid_from]) <= Time.now && Time.parse(l[:resource][:valid_until]) >= Time.now
+                    l[:resource][:components].each do |c|
+                      if c[:component][:name] == node_name.to_s && l[:resource][:account][:name] == acc
+                        lease = l
+                        break #found the correct lease
+                      end
+                    end
+                  end
+                end
+
+                if lease.nil? #if lease is nil it means no matching lease is found
+                  error "AUTH error: Lease nill"
+                  msg.properties.error_msg = "Node is not leased by your account."
+                  result = msg
+                  wait = false
+                  next
+                else
+                  debug "AUTH PASSED"
+                  msg.properties.node = node
+                  result = msg
+                  wait = false
+                  next
+                end
+              end
+            end
+          end
+        end
+
+        #waiting for the whole process to be completed
+        while wait
+          sleep 1
+        end
+
+        return result if result
+      else
+        debug "AUTH PASSED"
+        return msg
+      end
+
+    else
+      debug "AUTH PASSED"
+      return msg
+    end
+#     msg
+  end
+
+  private
+  def _get_account_name(msg)
+    #subject is ~ /C=US/ST=CA/O=ACME/OU=Roadrunner/CN=37a96f60-c53d-50d9-bbbf-3c552b89bdc5/emailAddress=root@nitlab.inf.uth.gr
+    subj = msg.issuer.subject.to_s
+    subj.gsub!(/.*CN=/, '')
+    subj.gsub!(/.*emailAddress=/, '')
+    subj.gsub!(/@.*/, '')
+    debug "AUTH user: #{subj}"
+    return subj
+  end
+end
+
+OmfCommon.init(@config[:operationMode], opts) do |el|#communication: { url: "xmpp://#{@xmpp[:proxy_user]}:#{@xmpp[:password]}@#{@xmpp[:server]}", auth: {} }) do
+  OmfCommon.comm.on_connected do |comm|
+    OmfCommon::Auth::CertificateStore.instance.register_default_certs(trusted_roots)
+    frisbee_entity.resource_id = OmfCommon.comm.local_topic.address
+    OmfCommon::Auth::CertificateStore.instance.register(frisbee_entity)
+    info "Frisbee Factory >> Connected to XMPP server"
+
+    frisbeeFact = OmfRc::ResourceFactory.create(:frisbee_factory, { uid: 'frisbee_factory', certificate: frisbee_entity })
+
+    comm.on_interrupted {
+      frisbeeFact.disconnect
+    }
+  end
+end
+

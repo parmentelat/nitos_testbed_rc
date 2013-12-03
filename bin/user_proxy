@@ -1,0 +1,57 @@
+#!/usr/bin/env ruby
+
+require 'omf_rc'
+require 'omf_common'
+require 'yaml'
+
+$stdout.sync = true
+
+@config = YAML.load_file('../etc/user_proxy_conf.yaml')
+@auth = @config[:auth]
+@xmpp = @config[:xmpp]
+
+require '../lib/user'
+require '../lib/user_factory'
+
+user_entity_cert = File.expand_path(@auth[:entity_cert])
+user_entity_key = File.expand_path(@auth[:entity_key])
+user_entity = OmfCommon::Auth::Certificate.create_from_pem(File.read(user_entity_cert))#, File.read(user_entity_key))
+
+trusted_roots = File.expand_path(@auth[:root_cert_dir])
+
+opts = {
+  communication: {
+    url:  "xmpp://#{@xmpp[:username]}:#{@xmpp[:password]}@#{@xmpp[:server]}",
+    auth: {
+      authenticate: true,
+      pdp: {
+        constructor: 'UserPDP'
+      }
+    }
+  }
+}
+
+class UserPDP
+  def initialize(opts = {})
+    debug "AUTH INIT>>> #{opts}"
+  end
+
+  def authorize(msg, &block)
+    msg
+  end
+end
+
+OmfCommon.init(@config[:operationMode], opts) do |el|#communication: { url: "xmpp://#{@xmpp[:proxy_user]}:#{@xmpp[:password]}@#{@xmpp[:server]}", auth: {} }) do
+  OmfCommon.comm.on_connected do |comm|
+    OmfCommon::Auth::CertificateStore.instance.register_default_certs(trusted_roots)
+    user_entity.resource_id = OmfCommon.comm.local_topic.address
+    OmfCommon::Auth::CertificateStore.instance.register(user_entity)
+
+    info "User Factory >> Connected to XMPP server"
+    userFact = OmfRc::ResourceFactory.create(:user_factory, { uid: 'user_factory', certificate: user_entity })
+
+    comm.on_interrupted {
+      userFact.disconnect
+    }
+  end
+end

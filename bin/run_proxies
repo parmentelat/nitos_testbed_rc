@@ -1,121 +1,21 @@
 #!/usr/bin/env ruby
 
-require 'time'
-require 'omf_rc'
-require 'omf_common'
-require 'yaml'
+libs = []
+libs << "../lib/master/omf/omf_common/lib/"
+libs << "../lib/master/omf/omf_rc/lib/"
 
-$stdout.sync = true
 
-@config = YAML.load_file('../etc/proxies_conf.yaml')
-@auth = @config[:auth]
-@xmpp = @config[:xmpp]
-$domain = @config[:domain][:ip]
-
-require '../lib/user'
-require '../lib/user_factory'
-require '../lib/cm_factory'
-require '../lib/frisbee'
-require '../lib/frisbeed'
-require '../lib/imagezip_server'
-require '../lib/imagezip_client'
-require '../lib/frisbee_factory'
-
-cm_entity_cert = File.expand_path(@auth[:cm_entity_cert])
-cm_entity_key = File.expand_path(@auth[:cm_entity_key])
-cm_entity = OmfCommon::Auth::Certificate.create_from_x509(File.read(cm_entity_cert), File.read(cm_entity_key))
-user_entity_cert = File.expand_path(@auth[:user_entity_cert])
-user_entity_key = File.expand_path(@auth[:user_entity_key])
-user_entity = OmfCommon::Auth::Certificate.create_from_x509(File.read(user_entity_cert), File.read(user_entity_key))
-frisbee_entity_cert = File.expand_path(@auth[:frisbee_entity_cert])
-frisbee_entity_key = File.expand_path(@auth[:frisbee_entity_key])
-frisbee_entity = OmfCommon::Auth::Certificate.create_from_x509(File.read(frisbee_entity_cert), File.read(frisbee_entity_key))
-
-trusted_roots = File.expand_path(@auth[:root_cert_dir])
-
-opts = {
-  communication: {
-    url:  "xmpp://#{@xmpp[:proxy_user]}:#{@xmpp[:password]}@#{@xmpp[:server]}",
-    auth: {
-      authenticate: true,
-      pdp: {
-        constructor: 'MyPDP',
-        trust: ['am']
-      }
-    }
-  }
-}
-
-class MyPDP
-  def initialize(opts = {})
-    @trust = opts[:trust] || []
-    puts "AUTH INIT>>> #{opts}"
+threads = []
+["user_proxy", "frisbee_proxy", "cm_proxy"].each do |sc|
+  threads << Thread.new do
+    cmd = "ruby "
+    libs.each {|l| cmd += "-I #{l} "}
+    cmd += sc
+    puts "EXEC: #{cmd}"
+    system(cmd)
   end
-
-  def authorize(msg, &block)
-#     puts "res_id(#{msg.properties.res_id})"
-#     cert = OmfCommon::Auth::CertificateStore.instance.cert_for(msg.src)
-#     puts "SUB(#{cert.subject})"
-#     puts "AUTH(#{msg.to_json}) >> PASS"
-#     puts "IVN(#{msg.instance_variable_names})"
-#     puts "res_id(#{msg.certOnTopic.inspect})"
-#     msg.methods.each_with_index do |m, i|
-#       begin
-#         puts "#{i} Method #{m} result (#{msg.send(m)})"
-#       rescue
-#         puts "#{i} Method #{m} needs arguements"
-#       end
-#     end
-    #puts "CERT(#{msg.cert.inspect})"
-#     puts "CLASS(#{msg.class}) - methods(#{msg.methods})"
-#     puts "content(#{msg.content.inspect})"
-#     puts "SRC(#{msg.src.inspect})"
-#     puts "OPER(#{msg.operation.inspect})"
-#     puts "TS(#{msg.ts.inspect})"
-#     puts "MID(#{msg.mid.inspect})"
-#     puts "REP_TO(#{msg.replyto.inspect})"
-#     puts "cid(#{msg.cid.inspect})"
-#     puts "res(#{msg.res_id.inspect})"
-    #puts CertificateStore.instance.cert_for_url(msg.res_id)
-     #iss = msg.issuer.resource_id
-#     if @trust.include? iss
-#       puts "AUTH(#{iss}) >>> PASS"
-#       msg
-#     else
-#       puts "AUTH(#{iss}) >>> FAILED"
-#     end
-    #puts "AUTH(#{iss}) >>> PASS"
-    msg
-  end
+  sleep 1
 end
 
-OmfCommon.init(:development, opts) do |el|#communication: { url: "xmpp://#{@xmpp[:proxy_user]}:#{@xmpp[:password]}@#{@xmpp[:server]}", auth: {} }) do
-  OmfCommon.comm.on_connected do |comm|
-    OmfCommon::Auth::CertificateStore.instance.register_default_certs(trusted_roots)
-#     OmfCommon::Auth::CertificateStore.instance.register_with_address(user_entity, OmfCommon.comm.local_topic.address)
-    #OmfCommon::Auth::CertificateStore.instance.register_with_address(cm_entity, OmfCommon.comm.local_topic.address)
-#     OmfCommon::Auth::CertificateStore.instance.register_with_address(frisbee_entity, OmfCommon.comm.local_topic.address)
-    OmfCommon::Auth::CertificateStore.instance.register(frisbee_entity, OmfCommon.comm.local_topic.address)
-#     OmfCommon::Auth::CertificateStore.instance.register(cm_entity, OmfCommon.comm.local_topic.address)
-#     OmfCommon::Auth::CertificateStore.instance.register(frisbee_entity, OmfCommon.comm.local_topic.address)
-    OmfCommon::Auth::CertificateStore.instance.register_trusted(user_entity)
-    OmfCommon::Auth::CertificateStore.instance.register_trusted(frisbee_entity)
-    OmfCommon::Auth::CertificateStore.instance.register_trusted(cm_entity)
-    OmfCommon::Auth::CertificateStore.instance.register(user_entity)
-    OmfCommon::Auth::CertificateStore.instance.register(cm_entity)
-    OmfCommon::Auth::CertificateStore.instance.register(frisbee_entity)
-
-    info "User Factory >> Connected to XMPP server"
-    userFact = OmfRc::ResourceFactory.create(:user_factory, { uid: 'user_factory', certificate: user_entity })
-    info "CM Factory >> Connected to XMPP server"
-    cmFact = OmfRc::ResourceFactory.create(:cm_factory, { uid: 'cm_factory', certificate: cm_entity })
-    info "Frisbee Factory >> Connected to XMPP server"
-    frisbeeFact = OmfRc::ResourceFactory.create(:frisbee_factory, { uid: 'frisbee_factory', certificate: frisbee_entity })
-
-    comm.on_interrupted {
-      userFact.disconnect
-      cmFact.disconnect
-      frisbeeFact.disconnect
-    }
-  end
-end
+threads.each {|t| t.join}
+sleep 1
