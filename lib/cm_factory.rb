@@ -11,6 +11,7 @@ module OmfRc::ResourceProxy::CMFactory
   register_proxy :cm_factory
 
   configure :state do |res, value|
+    debug "Received message '#{value.inspect}'"
     if error_msg = value.error_msg
       res.inform(:error,{
         event_type: "AUTH",
@@ -23,13 +24,14 @@ module OmfRc::ResourceProxy::CMFactory
     nod = {}
     nod[:node_name] = value.node[:resource][:name]
     value.node[:resource][:interfaces].each do |i|
-      if i[:role] == "control_network"
+      if i[:role] == "control"
         nod[:node_ip] = i[:ip][:address]
         nod[:node_mac] = i[:mac]
       elsif i[:role] == "cm_network"
         nod[:node_cm_ip] = i[:ip][:address]
       end
     end
+    nod[:node_cm_ip] = value.node[:resource][:cmc][:ip][:address]
 #     nod = {node_name: "node1", node_ip: "10.0.0.1", node_mac: "00-03-1d-0d-4b-96", node_cm_ip: "10.0.0.101"}
 
     case value[:status].to_sym

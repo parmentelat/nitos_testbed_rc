@@ -27,21 +27,33 @@ module OmfRc::ResourceProxy::ImagezipClient #Imagezip client
 
   hook :after_initial_configured do |client|
     Thread.new do
-      client.property.app_id = client.hrn.nil? ? client.uid : client.hrn
-
-      command = "#{client.property.binary_path} -o -z1 #{client.property.hardrive} - | /bin/nc -q 0 #{client.property.ip} #{client.property.port}"
-      debug "Executing command #{command}"
+      debug "Received message '#{client.opts.inspect}'"
+      if error_msg = client.opts.error_msg
+        res.inform(:error,{
+          event_type: "AUTH",
+          exit_code: "-1",
+          node_name: client.property.node_topic,
+          msg: error_msg
+        }, :ALL)
+        next
+      end
 
       nod = {}
       nod[:node_name] = client.opts.node.resource.name
       client.opts.node.resource.interfaces.each do |i|
-        if i[:role] == "control_network"
+        if i[:role] == "control"
           nod[:node_ip] = i[:ip][:address]
           nod[:node_mac] = i[:mac]
         elsif i[:role] == "cm_network"
           nod[:node_cm_ip] = i[:ip][:address]
         end
       end
+      nod[:node_cm_ip] = client.opts.node.resource.cmc.ip.address
+
+      client.property.app_id = client.hrn.nil? ? client.uid : client.hrn
+
+      command = "#{client.property.binary_path} -o -z1 #{client.property.hardrive} - | /bin/nc -q 0 #{client.property.ip} #{client.property.port}"
+      debug "Executing command #{command}"
   #     nod = {node_name: "node1", node_ip: "10.0.0.1", node_mac: "00-03-1d-0d-4b-96", node_cm_ip: "10.0.0.101"}
 
       host = Net::Telnet.new("Host" => nod[:node_ip], "Timeout" => false)#, "Prompt" => /[\w().-]*[\$#>:.]\s?(?:\(enable\))?\s*$/)

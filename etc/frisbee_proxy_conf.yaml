@@ -12,6 +12,10 @@
 #operation Mode for OmfCommon.init (development, production, etc)
 :operationMode: development
 
+#testbed xmpp topic
+:testbedTopic: am_controller
+
+#frisbee and imagezip configuration
 :frisbee:
   # Directory images are stored
   :imageDir: /var/lib/omf-images-6

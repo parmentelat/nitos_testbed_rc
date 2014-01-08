@@ -7,6 +7,7 @@ require 'optparse'
 @config = YAML.load_file('../etc/omf_script_conf.yaml')
 @auth = @config[:auth]
 @xmpp = @config[:xmpp]
+@omf = @config[:omf_script]
 
 options = {}
 opt_parser = OptionParser.new do |opts|
@@ -19,12 +20,12 @@ opt_parser = OptionParser.new do |opts|
   opts.separator  "     stat : report the status of a group of nodes"
   opts.separator "Options"
 
-  opts.on('-i', '--image IMAGE_NAME', 'the image name for load command') { |v| options[:image] = v }
+  opts.on('-i', '--image IMAGE_NAME', 'the image name for load command (if nill default image will be loaded)') { |v| options[:image] = v }
   opts.on('-n', '--node NODE', 'node name for save command') { |v| options[:node] = v }
   opts.on('-a', '--status STATUS', 'the status you want to get the node to. Required only on tell command.') { |v| options[:status] = v }
   opts.on('-t', '--target_nodes NODES', 'target nodes you want to run the command too. Required on commands load, tell and stat.') {|v| options[:target_nodes] = v.split(",") }
 
-  options[:last_action] = "reset" #actions are reset and shutdown
+  options[:last_action] = @omf[:last_action] #actions are reset and shutdown
   opts.on('-l', '--last_action ACTION', "action you want to perform after the commands is executed. Optional on commands load and save (last_action can be reset/shutdown. Default #{options[:last_action]})."){|v| options[:last_action] = v}
   options[:wait] = false
   opts.on('-w', '--wait', 'wait until pingable. Used in tell command (default vallue is off)'){|v| options[:wait] = true}
@@ -277,7 +278,6 @@ end
 #run imagezip server
 def create_imagezip_server(comm, fcontroller, port, options)
   fcontroller.create(:imagezip_server, {hrn: 'imagezip server', image: options[:image], port: port}) do |reply_msg|
-    #image "/var/lib/omf-images-5.4/baseline.ndz"
     if reply_msg.success?
       server = reply_msg.resource
       @@server = server
@@ -604,8 +604,7 @@ end
 
 opt_parser.parse!
 
-#:development :production
-OmfCommon.init(:development, communication: { url: "xmpp://#{@xmpp[:script_user]}:#{@xmpp[:password]}@#{@xmpp[:server]}", auth: {} }) do
+OmfCommon.init(@config[:operationMode], communication: { url: "xmpp://#{@xmpp[:script_user]}:#{@xmpp[:password]}@#{@xmpp[:server]}", auth: {} }) do
   OmfCommon.comm.on_connected do |comm|
     OmfCommon::Auth::CertificateStore.instance.register_default_certs(trusted_roots)
     entity.resource_id = OmfCommon.comm.local_topic.address
@@ -615,7 +614,7 @@ OmfCommon.init(:development, communication: { url: "xmpp://#{@xmpp[:script_user]
 
     case ARGV[0]
     when "load"
-      if !options[:image].nil? && options[:node].nil? && options[:status].nil? && !options[:target_nodes].nil?
+      if options[:node].nil? && options[:status].nil? && !options[:target_nodes].nil?
         if options[:last_action] == "reset" || options[:last_action] == "shutdown"
           puts "call load on options #{options.inspect}"
           load(comm, options)

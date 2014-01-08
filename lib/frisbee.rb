@@ -28,22 +28,31 @@ module OmfRc::ResourceProxy::Frisbee #frisbee client
 
   hook :after_initial_configured do |client|
     Thread.new do
+      debug "Received message '#{client.opts.inspect}'"
+      if error_msg = client.opts.error_msg
+        res.inform(:error,{
+          event_type: "AUTH",
+          exit_code: "-1",
+          node_name: client.property.node_topic,
+          msg: error_msg
+        }, :ALL)
+        next
+      end
       nod = {}
       nod[:node_name] = client.opts.node.resource.name
       client.opts.node.resource.interfaces.each do |i|
-        if i[:role] == "control_network"
+        if i[:role] == "control"
           nod[:node_ip] = i[:ip][:address]
           nod[:node_mac] = i[:mac]
-        elsif i[:role] == "cm_network"
-          nod[:node_cm_ip] = i[:ip][:address]
         end
       end
+      nod[:node_cm_ip] = client.opts.node.resource.cmc.ip.address
       #nod = {node_name: "node1", node_ip: "10.0.0.1", node_mac: "00-03-1d-0d-4b-96", node_cm_ip: "10.0.0.101"}
       client.property.multicast_interface = nod[:node_ip]
       client.property.app_id = client.hrn.nil? ? client.uid : client.hrn
 
-      command = "#{client.property.binary_path} -i #{client.property.multicast_interface} -m #{client.property.multicast_address} "
-      command += "-p #{client.property.port} #{client.property.hardrive}"
+      command = "#{client.property.binary_path} -i #{client.property.multicast_interface} -m #{client.property.multicast_address} -p #{client.property.port} #{client.property.hardrive}"
+      debug "Executing command #{command}"
 
       host = Net::Telnet.new("Host" => client.property.multicast_interface.to_s, "Timeout" => 200, "Prompt" => /[\w().-]*[\$#>:.]\s?(?:\(enable\))?\s*$/)
       host.cmd(command.to_s) do |c|

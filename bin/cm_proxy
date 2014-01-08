@@ -33,6 +33,7 @@ opts = {
 class CmPDP
   def initialize(opts = {})
     debug "AUTH INIT>>> #{opts}"
+    @config = YAML.load_file('../etc/frisbee_proxy_conf.yaml')
   end
 
   def authorize(msg, &block)
@@ -40,7 +41,7 @@ class CmPDP
     if msg.operation.to_sym == :configure
       wait = true
       result = nil
-      OmfCommon.comm.subscribe("am_controller") do |am_con|
+      OmfCommon.comm.subscribe(@config[:testbedTopic]) do |am_con|
         acc = _get_account_name(msg)
 
         if acc.nil?

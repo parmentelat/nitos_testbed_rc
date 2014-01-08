@@ -6,5 +6,9 @@
   :root_cert_dir: ~/.omf/trusted_roots
   :entity_cert: ~/.omf/user_cert.pem
   :entity_key: ~/.omf/user_cert.pkey
-
-
+#operation mode for OmfCommon.init (development, production, etc)
+:operationMode: development
+#omf script configuration
+:omf_script:
+  #default last action on load and save commands (reset or shutdown)
+  :last_action: reset

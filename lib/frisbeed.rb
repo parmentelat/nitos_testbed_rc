@@ -2,8 +2,6 @@
 #created by parent :frisbee_factory
 #used in load command
 
-#$domain = @config[:domain][:ip]
-
 module OmfRc::ResourceProxy::Frisbeed
   include OmfRc::ResourceProxyDSL
   require 'omf_common/exec_app'
@@ -24,12 +22,19 @@ module OmfRc::ResourceProxy::Frisbeed
   property :multicast_address, :default => @fconf[:mcAddress]             #multicast address, example 224.0.0.1 (-m arguement)
   property :port                                                          #port, example 7000 (-p arguement)
   property :speed, :default => @fconf[:bandwidth]                         #bandwidth speed in bits/sec, example 50000000 (-W arguement)
-  property :image, :default => @fconf[:imageDir] + @fconf[:defaultImage]  #image to burn, example /var/lib/omf-images-5.4/baseline.ndz
+  property :image, :default => @fconf[:imageDir] + '/' + @fconf[:defaultImage]  #image to burn, example /var/lib/omf-images-5.4/baseline.ndz
 
 
 
   hook :after_initial_configured do |server|
     server.property.app_id = server.hrn.nil? ? server.uid : server.hrn
+    server.property.image = server.property.image.nil? ? @fconf[:imageDir] + '/' + @fconf[:defaultImage] : server.property.image
+    server.property.image = server.property.image.start_with?('/') ? server.property.image : @fconf[:imageDir] + '/' + server.property.image
+    unless File.file?(server.property.image)
+      debug "File '#{server.property.image}' does not exist."
+      raise "FILE NOT FOUND."
+    end
+    debug "Frisbee server is loading image: #{server.property.image}"
 
     @app = ExecApp.new(server.property.app_id, server.build_command_line, server.property.map_err_to_out) do |event_type, app_id, msg|
       server.process_event(server, event_type, app_id, msg)

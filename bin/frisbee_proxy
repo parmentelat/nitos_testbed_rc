@@ -37,6 +37,7 @@ opts = {
 class FrisbeePDP
   def initialize(opts = {})
     debug "AUTH INIT>>> #{opts}"
+    @config = YAML.load_file('../etc/frisbee_proxy_conf.yaml')
   end
 
   def authorize(msg, &block)
@@ -45,7 +46,7 @@ class FrisbeePDP
       if msg.rtype.to_sym == :frisbee || msg.rtype.to_sym == :imagezip_client
         wait = true
         result = nil
-        OmfCommon.comm.subscribe("am_controller") do |am_con|
+        OmfCommon.comm.subscribe(@config[:testbedTopic]) do |am_con|
           acc = _get_account_name(msg)
 
           if acc.nil?
