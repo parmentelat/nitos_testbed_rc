@@ -1,7 +1,12 @@
 #this resource is used to control chassis managers.
+require 'rubygems'
 require 'yaml'
 require 'open-uri'
 require 'nokogiri'
+require 'net/ssh'
+
+REBOOT_CMD = "reboot"
+SHUTDOWN_CMD = "shutdown -P now"
 
 module OmfRc::ResourceProxy::CMFactory
   include OmfRc::ResourceProxyDSL
@@ -86,10 +91,12 @@ module OmfRc::ResourceProxy::CMFactory
     resp
   end
 
+  #this is used by other methods in this scope
   work("get_status") do |res, node|
-    puts "http://#{node[:node_cm_ip].to_s}/state"
+    debug "http://#{node[:node_cm_ip].to_s}/state"
     doc = Nokogiri::XML(open("http://#{node[:node_cm_ip].to_s}/state"))
-    resp = doc.xpath("//Measurement//type//value").text.strip
+    resp = doc.xpath("//Response//line//value").text.strip
+    debug "state response: #{resp}"
 
     if resp == 'on'
       symlink_name = "/tftpboot/pxelinux.cfg/01-#{node[:node_mac]}"
@@ -103,6 +110,7 @@ module OmfRc::ResourceProxy::CMFactory
     end
   end
 
+  #this is used by the get status call
   work("status") do |res, node|
     debug "Status url: http://#{node[:node_cm_ip].to_s}/state"
     begin
@@ -118,10 +126,10 @@ module OmfRc::ResourceProxy::CMFactory
     end
 
     res.inform(:status, {
-      current: "#{doc.xpath("//Measurement//type//value").text}",
+      current: "#{doc.xpath("//Response//line//value").text}",
       node_name: "#{node[:node_name].to_s}"
     }, :ALL)
-    sleep 1
+    sleep 1 #this solves the getting stuck problem.
   end
 
   work("start_node") do |res, node, wait|
@@ -166,25 +174,39 @@ module OmfRc::ResourceProxy::CMFactory
   end
 
   work("stop_node") do |res, node, wait|
-    puts "Stop_node url: http://#{node[:node_cm_ip].to_s}/off"
     begin
-      doc = Nokogiri::XML(open("http://#{node[:node_cm_ip].to_s}/off"))
-    rescue
-      res.inform(:error, {
-        event_type: "HTTP",
-        exit_code: "-1",
-        node_name: "#{node[:node_name].to_s}",
-        msg: "failed to reach cm, ip: #{node[:node_cm_ip].to_s}."
-      }, :ALL)
-      next
-    end
-    puts doc
-    if doc.xpath("//Response").text == 'ok'
+      debug "Shutting down node '#{node[:node_name]}' through ssh."
+      ssh = Net::SSH.start(node[:node_ip], 'root')#, :password => @password)
+      resp = ssh.exec!(SHUTDOWN_CMD)
+      ssh.close
+      debug "shutting down completed with ssh."
       res.inform(:status, {
           node_name: "#{node[:node_name].to_s}",
           current: :running,
           desired: :stopped
       }, :ALL)
+    rescue => ex
+      puts ex.message
+      begin
+        debug "ssh failed, using CM card instead."
+        debug "Stop_node url: http://#{node[:node_cm_ip].to_s}/off"
+        doc = Nokogiri::XML(open("http://#{node[:node_cm_ip].to_s}/off"))
+        if doc.xpath("//Response").text == 'ok'
+          res.inform(:status, {
+              node_name: "#{node[:node_name].to_s}",
+              current: :running,
+              desired: :stopped
+          }, :ALL)
+        end
+      rescue
+        res.inform(:error, {
+          event_type: "HTTP",
+          exit_code: "-1",
+          node_name: "#{node[:node_name].to_s}",
+          msg: "failed to reach cm, ip: #{node[:node_cm_ip].to_s}."
+        }, :ALL)
+        next
+      end
     end
 
     if wait
@@ -207,25 +229,38 @@ module OmfRc::ResourceProxy::CMFactory
   end
 
   work("reset_node") do |res, node, wait|
-    debug "Reset_node url: http://#{node[:node_cm_ip].to_s}/reset"
     begin
-      doc = Nokogiri::XML(open("http://#{node[:node_cm_ip].to_s}/reset"))
-    rescue
-      res.inform(:error, {
-        event_type: "HTTP",
-        exit_code: "-1",
-        node_name: "#{node[:node_name].to_s}",
-        msg: "failed to reach cm, ip: #{node[:node_cm_ip].to_s}."
-      }, :ALL)
-      next
-    end
-    puts doc
-     if doc.xpath("//Response").text == 'ok'
+      debug "Rebooting node '#{node[:node_name]}' through ssh."
+      ssh = Net::SSH.start(node[:node_ip], 'root')#, :password => @password)
+      resp = ssh.exec!(REBOOT_CMD)
+      ssh.close
+      debug "Rebooting completed with ssh."
       res.inform(:status, {
           node_name: "#{node[:node_name].to_s}",
           current: :running,
           desired: :resetted
       }, :ALL)
+    rescue
+      begin
+        debug "ssh failed, using CM card instead."
+        debug "Reset_node url: http://#{node[:node_cm_ip].to_s}/reset"
+        doc = Nokogiri::XML(open("http://#{node[:node_cm_ip].to_s}/reset"))
+        if doc.xpath("//Response").text == 'ok'
+          res.inform(:status, {
+              node_name: "#{node[:node_name].to_s}",
+              current: :running,
+              desired: :resetted
+          }, :ALL)
+        end
+      rescue
+        res.inform(:error, {
+          event_type: "HTTP",
+          exit_code: "-1",
+          node_name: "#{node[:node_name].to_s}",
+          msg: "failed to reach cm, ip: #{node[:node_cm_ip].to_s}."
+        }, :ALL)
+        next
+      end
     end
 
     if wait
