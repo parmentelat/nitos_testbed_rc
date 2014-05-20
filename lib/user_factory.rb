@@ -8,6 +8,6 @@ module OmfRc::ResourceProxy::UserFactory
 
   configure :deluser do |res, value|
     cmd = 'userdel -r ' + value[:username]
-    exec cmd
+    system cmd
   end
 end

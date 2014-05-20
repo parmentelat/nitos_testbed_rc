@@ -185,8 +185,7 @@ module OmfRc::ResourceProxy::CMFactory
           current: :running,
           desired: :stopped
       }, :ALL)
-    rescue => ex
-      puts ex.message
+    rescue
       begin
         debug "ssh failed, using CM card instead."
         debug "Stop_node url: http://#{node[:node_cm_ip].to_s}/off"
