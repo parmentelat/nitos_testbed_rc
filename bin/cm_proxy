@@ -6,7 +6,7 @@ require 'yaml'
 
 $stdout.sync = true
 
-@config = YAML.load_file('../etc/cm_proxy_conf.yaml')
+@config = YAML.load_file(File.dirname(__FILE__) + '../etc/cm_proxy_conf.yaml') 
 @auth = @config[:auth]
 @xmpp = @config[:xmpp]
 
