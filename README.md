@@ -1,4 +1,4 @@
-omf_rc_controller
+Nitos Testbed resource controllers
 =================
 
 Contains:
