@@ -1,5 +1,5 @@
 #!/usr/bin/env ruby
-
+require 'rubygems'
 require 'omf_rc'
 require 'omf_common'
 require 'yaml'
@@ -10,7 +10,7 @@ $stdout.sync = true
 @auth = @config[:auth]
 @xmpp = @config[:xmpp]
 
-require '../lib/cm_factory'
+require 'nitos_testbed_rc/cm_factory'
 
 cm_entity_cert = File.expand_path(@auth[:entity_cert])
 cm_entity_key = File.expand_path(@auth[:entity_key])
