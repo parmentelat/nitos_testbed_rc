@@ -1,9 +1,0 @@
-:xmpp:
-  :proxy_user: testbed_rc
-  :script_user: script_user
-  :password: testbed_rc
-  :server: localhost
-:auth:
-  :root_cert_dir: ~/.omf/trusted_roots
-  :entity_cert: ~/.omf/urc.pem
-  :entity_key: ~/.omf/user_rc_key.pem
