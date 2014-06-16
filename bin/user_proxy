@@ -6,12 +6,13 @@ require 'yaml'
 
 $stdout.sync = true
 
-@config = YAML.load_file('../etc/user_proxy_conf.yaml')
+@config = YAML.load_file('/etc/nitos_testbed_rc/user_proxy_conf.yaml')
+# @config = YAML.load_file(File.join(File.dirname(File.expand_path(__FILE__)), '.../etc/user_proxy_conf.yaml'))
 @auth = @config[:auth]
 @xmpp = @config[:xmpp]
 
-require '../lib/user'
-require '../lib/user_factory'
+require 'nitos_testbed_rc/user'
+require 'nitos_testbed_rc/user_factory'
 
 user_entity_cert = File.expand_path(@auth[:entity_cert])
 user_entity_key = File.expand_path(@auth[:entity_key])

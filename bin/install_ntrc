@@ -1,0 +1,26 @@
+#!/usr/bin/env ruby
+require 'fileutils'
+
+spec = Gem::Specification.find_by_name("nitos_testbed_rc")
+gem_root = spec.gem_dir
+config_path = "/etc/nitos_testbed_rc"
+
+puts "Copying configuration files from '#{gem_root}'."
+
+unless File.directory?(config_path)
+  puts "Generating directory '#{config_path}'."
+  FileUtils.mkdir_p(config_path)
+end
+
+conf_files = []
+conf_files << "cm_proxy_conf.yaml"
+conf_files << "frisbee_proxy_conf.yaml"
+conf_files << "user_proxy_conf.yaml"
+conf_files << "omf_script_conf.yaml"
+
+conf_files.each do |file|
+  puts "Corying configuration file '#{gem_root}/etc/#{file}' to '#{config_path}'."
+  FileUtils.cp "#{gem_root}/etc/#{file}", "#{config_path}/#{file}"
+  FileUtils.chmod 0644, "#{config_path}/#{file}"
+end
+puts "done."

@@ -4,7 +4,8 @@ $ports = []
 module OmfRc::ResourceProxy::FrisbeeFactory
   include OmfRc::ResourceProxyDSL
 
-  @config = YAML.load_file('../etc/frisbee_proxy_conf.yaml')
+  @config = YAML.load_file('/etc/nitos_testbed_rc/frisbee_proxy_conf.yaml')
+  # @config = YAML.load_file(File.join(File.dirname(File.expand_path(__FILE__)), '../etc/frisbee_proxy_conf.yaml'))
   @fconf = @config[:frisbee]
 
   register_proxy :frisbee_factory

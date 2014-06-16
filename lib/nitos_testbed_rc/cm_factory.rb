@@ -10,7 +10,9 @@ SHUTDOWN_CMD = "shutdown -P now"
 
 module OmfRc::ResourceProxy::CMFactory
   include OmfRc::ResourceProxyDSL
-  @config = YAML.load_file('../etc/cm_proxy_conf.yaml')
+  
+  @config = YAML.load_file('/etc/nitos_testbed_rc/cm_proxy_conf.yaml')
+  # @config = YAML.load_file(File.join(File.dirname(File.expand_path(__FILE__)), '../etc/cm_proxy_conf.yaml'))
   @timeout = @config[:timeout]
 
   register_proxy :cm_factory

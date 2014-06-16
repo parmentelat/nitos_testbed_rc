@@ -1,8 +1,9 @@
 #!/usr/bin/env ruby
 
 libs = []
-libs << "../lib/master/omf/omf_common/lib/"
-libs << "../lib/master/omf/omf_rc/lib/"
+# if you need to add libraries add them bellow. Examples:
+# libs << "../lib/master/omf/omf_common/lib/"
+# libs << "../lib/master/omf/omf_rc/lib/"
 
 
 threads = []

@@ -5,16 +5,16 @@ require 'omf_common'
 require 'yaml'
 
 $stdout.sync = true
-
-@config = YAML.load_file('../etc/frisbee_proxy_conf.yaml')
+@config = YAML.load_file('/etc/nitos_testbed_rc/frisbee_proxy_conf.yaml')
+# @config = YAML.load_file(File.join(File.dirname(File.expand_path(__FILE__)), '.../etc/frisbee_proxy_conf.yaml'))
 @auth = @config[:auth]
 @xmpp = @config[:xmpp]
 
-require '../lib/frisbee'
-require '../lib/frisbeed'
-require '../lib/imagezip_server'
-require '../lib/imagezip_client'
-require '../lib/frisbee_factory'
+require 'nitos_testbed_rc/frisbee'
+require 'nitos_testbed_rc/frisbeed'
+require 'nitos_testbed_rc/imagezip_server'
+require 'nitos_testbed_rc/imagezip_client'
+require 'nitos_testbed_rc/frisbee_factory'
 
 frisbee_entity_cert = File.expand_path(@auth[:entity_cert])
 frisbee_entity_key = File.expand_path(@auth[:entity_key])
@@ -37,7 +37,8 @@ opts = {
 class FrisbeePDP
   def initialize(opts = {})
     debug "AUTH INIT>>> #{opts}"
-    @config = YAML.load_file('../etc/frisbee_proxy_conf.yaml')
+    @config = YAML.load_file('/etc/nitos_testbed_rc/frisbee_proxy_conf.yaml')
+    # @config = YAML.load_file(File.join(File.dirname(File.expand_path(__FILE__)), '.../etc/frisbee_proxy_conf.yaml'))
   end
 
   def authorize(msg, &block)

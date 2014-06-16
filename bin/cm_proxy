@@ -6,7 +6,8 @@ require 'yaml'
 
 $stdout.sync = true
 
-@config = YAML.load_file(File.dirname(__FILE__) + '/../etc/cm_proxy_conf.yaml') 
+@config = YAML.load_file('/etc/nitos_testbed_rc/cm_proxy_conf.yaml')
+# @config = YAML.load_file(File.join(File.dirname(File.expand_path(__FILE__)), '../etc/cm_proxy_conf.yaml'))
 @auth = @config[:auth]
 @xmpp = @config[:xmpp]
 
@@ -33,7 +34,8 @@ opts = {
 class CmPDP
   def initialize(opts = {})
     debug "AUTH INIT>>> #{opts}"
-    @config = YAML.load_file('../etc/frisbee_proxy_conf.yaml')
+    @config = YAML.load_file('/etc/nitos_testbed_rc/cm_proxy_conf.yaml')
+    # @config = YAML.load_file(File.join(File.dirname(File.expand_path(__FILE__)), '../etc/cm_proxy_conf.yaml'))
   end
 
   def authorize(msg, &block)

@@ -8,7 +8,8 @@ require 'timeout'
 module OmfRc::ResourceProxy::Frisbee #frisbee client
   include OmfRc::ResourceProxyDSL
   require 'omf_common/exec_app'
-  @config = YAML.load_file('../etc/frisbee_proxy_conf.yaml')
+  @config = YAML.load_file('/etc/nitos_testbed_rc/frisbee_proxy_conf.yaml')
+  # @config = YAML.load_file(File.join(File.dirname(File.expand_path(__FILE__)), '../etc/frisbee_proxy_conf.yaml'))
   @fconf = @config[:frisbee]
 
   register_proxy :frisbee, :create_by => :frisbee_factory
