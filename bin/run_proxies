@@ -5,15 +5,22 @@ libs = []
 # libs << "../lib/master/omf/omf_common/lib/"
 # libs << "../lib/master/omf/omf_rc/lib/"
 
+spec = Gem::Specification.find_by_name("nitos_testbed_rc")
+gem_root = spec.gem_dir
 
 threads = []
 ["user_proxy", "frisbee_proxy", "cm_proxy"].each do |sc|
   threads << Thread.new do
-    cmd = "ruby "
-    libs.each {|l| cmd += "-I #{l} "}
-    cmd += sc
-    puts "EXEC: #{cmd}"
-    system(cmd)
+    if libs.empty?
+      puts "EXEC: #{sc}"
+      system(sc)
+    else
+      cmd = "ruby "
+      libs.each {|l| cmd += "-I #{l} "}
+      cmd += "#{gem_root}/bin/#{sc}"
+      puts "EXEC: #{cmd}"
+      system(cmd)
+    end
   end
   sleep 1
 end
