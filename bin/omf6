@@ -4,7 +4,7 @@ require 'time'
 require 'omf_common'
 require 'optparse'
 
-@config = YAML.load_file('/etc/nitos_testbed_rc/omf_script_conf.yaml')
+@config = YAML.load_file('~/.omf/etc/omf_script_conf.yaml')
 # @config = YAML.load_file(File.join(File.dirname(File.expand_path(__FILE__)), '.../etc/omf_script_conf.yaml'))
 @auth = @config[:auth]
 @xmpp = @config[:xmpp]
