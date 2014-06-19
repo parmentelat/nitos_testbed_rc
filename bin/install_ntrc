@@ -24,7 +24,7 @@ conf_files.each do |file|
   FileUtils.chmod 0644, "#{config_path}/#{file}"
 end
 
-config_path = "~/.omf/etc"
+config_path = File.expand_path("~/.omf/etc")
 unless File.directory?(config_path)
   puts "Generating directory '#{config_path}'."
   FileUtils.mkdir_p(config_path)

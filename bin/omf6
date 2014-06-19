@@ -3,8 +3,9 @@ require 'rubygems'
 require 'time'
 require 'omf_common'
 require 'optparse'
+CONF_PATH = '~/.omf/etc/omf_script_conf.yaml'
 
-@config = YAML.load_file('~/.omf/etc/omf_script_conf.yaml')
+@config = YAML.load_file(File.expand_path(CONF_PATH))
 # @config = YAML.load_file(File.join(File.dirname(File.expand_path(__FILE__)), '.../etc/omf_script_conf.yaml'))
 @auth = @config[:auth]
 @xmpp = @config[:xmpp]
