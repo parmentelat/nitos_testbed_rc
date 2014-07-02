@@ -77,10 +77,12 @@ class CmPDP
               leases = l_msg.read_property("leases")[:resources]
               leases.each do |l|
                 if Time.parse(l[:resource][:valid_from]) <= Time.now && Time.parse(l[:resource][:valid_until]) >= Time.now
-                  l[:resource][:components].each do |c|
-                    if c[:component][:name] == node_name.to_s && l[:resource][:account][:name] == acc
-                      lease = l
-                      break #found the correct lease
+                  unless l[:resource][:components].nil?
+                    l[:resource][:components].each do |c|
+                      if c[:component][:name] == node_name.to_s && l[:resource][:account][:name] == acc
+                        lease = l
+                        break #found the correct lease
+                      end
                     end
                   end
                 end
