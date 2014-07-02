@@ -4,12 +4,18 @@ require 'fileutils'
 spec = Gem::Specification.find_by_name("nitos_testbed_rc")
 gem_root = spec.gem_dir
 config_path = "/etc/nitos_testbed_rc"
+log_path = "/var/log/ntrc"
 
 puts "Copying configuration files from '#{gem_root}'."
 
 unless File.directory?(config_path)
   puts "Generating directory '#{config_path}'."
   FileUtils.mkdir_p(config_path)
+end
+
+unless File.directory?(log_path)
+  puts "Generating directory '#{log_path}'."
+  FileUtils.mkdir_p(log_path)
 end
 
 conf_files = []
@@ -32,4 +38,11 @@ end
 
 FileUtils.cp "#{gem_root}/etc/omf_script_conf.yaml", "#{config_path}/omf_script_conf.yaml"
 FileUtils.chmod 0644, "#{config_path}/omf_script_conf.yaml"
+
+puts "Copying initialization script 'run_ntrc.sh'."
+FileUtils.cp "#{gem_root}/init/run_ntrc.sh", "/usr/local/bin/run_ntrc.sh"
+
+FileUtils.cp "#{gem_root}/init/ntrc.conf", "/etc/init/ntrc.conf"
+puts "Upstart script has been installed. Execute 'start ntrc' to run all the proxies."
+
 puts "done."
