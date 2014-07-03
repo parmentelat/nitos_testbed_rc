@@ -52,10 +52,35 @@ else
     fi
 fi
 
-EXEC=`which run_proxies`
-if [[ $? != 0 ]] ; then
-    die "could not find run_proxies executable"
-fi
+EXEC=""
 
-echo "Running OMF6 RC"
-exec /usr/bin/env ruby$RUBY_BIN_SUFFIX $EXEC $@ 
+case "$1" in
+
+1)  echo "Starting user_proxy"
+    EXEC=`which user_proxy`
+    if [[ $? != 0 ]] ; then
+        die "could not find user_proxy executable"
+    fi
+    ;;
+2)  echo "Starting frisbee_proxy"
+    EXEC=`which frisbee_proxy`
+    if [[ $? != 0 ]] ; then
+        die "could not find frisbee_proxy executable"
+    fi
+    ;;
+3)  echo "Starting cm_proxy"
+    EXEC=`which cm_proxy`
+    if [[ $? != 0 ]] ; then
+        die "could not find cm_proxy executable"
+    fi
+    ;;
+*) echo "Starting run_proxy"
+    EXEC=`which run_proxy`
+    if [[ $? != 0 ]] ; then
+        die "could not find run_proxy executable"
+    fi
+    ;;
+esac
+
+echo "Running $EXEC"
+exec /usr/bin/env ruby$RUBY_BIN_SUFFIX $EXEC 
