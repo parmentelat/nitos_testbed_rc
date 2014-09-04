@@ -29,8 +29,8 @@ module OmfRc::ResourceProxy::CMFactory
       next
     end
     nod = {}
-    nod[:node_name] = value.node[:resource][:name]
-    value.node[:resource][:interfaces].each do |i|
+    nod[:node_name] = value.node[:name]
+    value.node[:interfaces].each do |i|
       if i[:role] == "control"
         nod[:node_ip] = i[:ip][:address]
         nod[:node_mac] = i[:mac]
@@ -38,7 +38,7 @@ module OmfRc::ResourceProxy::CMFactory
         nod[:node_cm_ip] = i[:ip][:address]
       end
     end
-    nod[:node_cm_ip] = value.node[:resource][:cmc][:ip][:address]
+    nod[:node_cm_ip] = value.node[:cmc][:ip][:address]
 #     nod = {node_name: "node1", node_ip: "10.0.0.1", node_mac: "00-03-1d-0d-4b-96", node_cm_ip: "10.0.0.101"}
 
     case value[:status].to_sym

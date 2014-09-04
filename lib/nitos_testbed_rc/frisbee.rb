@@ -40,14 +40,14 @@ module OmfRc::ResourceProxy::Frisbee #frisbee client
         next
       end
       nod = {}
-      nod[:node_name] = client.opts.node.resource.name
+      nod[:node_name] = client.opts.node.name
       client.opts.node.resource.interfaces.each do |i|
         if i[:role] == "control"
           nod[:node_ip] = i[:ip][:address]
           nod[:node_mac] = i[:mac]
         end
       end
-      nod[:node_cm_ip] = client.opts.node.resource.cmc.ip.address
+      nod[:node_cm_ip] = client.opts.node.cmc.ip.address
       #nod = {node_name: "node1", node_ip: "10.0.0.1", node_mac: "00-03-1d-0d-4b-96", node_cm_ip: "10.0.0.101"}
       client.property.multicast_interface = nod[:node_ip]
       client.property.app_id = client.hrn.nil? ? client.uid : client.hrn

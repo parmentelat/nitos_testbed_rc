@@ -3,6 +3,10 @@ require 'rubygems'
 require 'omf_rc'
 require 'omf_common'
 require 'yaml'
+require "net/https"
+require "uri"
+require "json"
+require 'time'
 
 $stdout.sync = true
 
@@ -41,77 +45,129 @@ class CmPDP
   def authorize(msg, &block)
     debug "AUTH message received: #{msg.operation}"
     if msg.operation.to_sym == :configure
-      wait = true
-      result = nil
-      OmfCommon.comm.subscribe(@config[:testbedTopic]) do |am_con|
-        acc = _get_account_name(msg)
+      acc = _get_account_name(msg)
 
-        if acc.nil?
-          error "AUTH error: acc nill"
-          msg.properties.state.error_msg = "Account name not found"
-          result = msg
-          wait = false
-          next
-        end
+      if acc.nil?
+        error "AUTH error: Account not found"
+        msg.properties.state.error_msg = "Account name not found"
+        return msg# next
+      end
 
-        node_name = msg.properties.state.node
-        am_con.request([:nodes]) do |n_msg|
-          nodes = n_msg.read_property("nodes")[:resources]
-          node = nil
-          nodes.each do |n|
-            if n[:resource][:name].to_s == node_name.to_s
-              node = n
-              break
-            end
-          end
+      node_name = msg.properties.state.node
+      broker = "https://10.64.44.12:8001"
 
-          lease = nil
-          if node.nil?
-            error "AUTH error: Node nill"
-            msg.properties.state.error_msg = "Wrong node name."
-            result = msg
-            wait = false
-            next
-          else
-            am_con.request([:leases]) do |l_msg|
-              leases = l_msg.read_property("leases")[:resources]
-              leases.each do |l|
-                if Time.parse(l[:resource][:valid_from]) <= Time.now && Time.parse(l[:resource][:valid_until]) >= Time.now
-                  unless l[:resource][:components].nil?
-                    l[:resource][:components].each do |c|
-                      if c[:component][:name] == node_name.to_s && l[:resource][:account][:name] == acc
-                        lease = l
-                        break #found the correct lease
-                      end
-                    end
-                  end
-                end
-              end
+      uri = URI.parse("#{broker}/resources/nodes?name=#{node_name}")
+      http = Net::HTTP.new(uri.host, uri.port)
+      http.use_ssl = true
+      http.verify_mode = OpenSSL::SSL::VERIFY_NONE
+      request = Net::HTTP::Get.new(uri.request_uri)
+      response = http.request(request)
+      resp = JSON.parse(response.body, :symbolize_names => true)
 
-              if lease.nil? #if lease is nil it means no matching lease is found
-                error "AUTH error: Lease nill"
-                msg.properties.state.error_msg = "Node is not leased by your account."
-                result = msg
-                wait = false
-                next
-              else
-                debug "AUTH PASSED"
-                msg.properties.state.node = node
-                result = msg
-                wait = false
-                next
-              end
-            end
-          end
+      if response.header.code != '200'
+        error "AUTH error: empty response"
+        msg.properties.state.error_msg = "#{resp[:reason]} - code: '#{resp[:exception][:code]}'"
+        return msg# next
+      end
+
+      node = resp[:resource_response]
+      if node.nil?
+        error "AUTH error: Node not found"
+        msg.properties.state.error_msg = "#{resp[:reason]} - code: '#{resp[:exception][:code]}'"
+        return msg
+      end
+
+      node = node[:resources].first
+      lease = nil
+      node[:leases].each do |l|
+        l = l[:lease]
+        next if l[:account][:name] != acc
+        if Time.parse(l[:valid_from]) <= Time.now && Time.parse(l[:valid_until]) >= Time.now
+          lease = l
+          break
         end
       end
 
-      #waiting for the whole process to be completed
-      while wait
-        sleep 1
+      if lease.nil?
+        error "AUTH error: node not available"
+        msg.properties.state.error_msg = "Node is not leased by your account."
+        return msg
+      else
+        debug "AUTH PASSED"
+        msg.properties.state.node = node
+        return msg
       end
+      # wait = true
+      # result = nil
+      # OmfCommon.comm.subscribe(@config[:testbedTopic]) do |am_con|
+      #   acc = _get_account_name(msg)
 
-      return result if result
+      #   if acc.nil?
+      #     error "AUTH error: acc nill"
+      #     msg.properties.state.error_msg = "Account name not found"
+      #     result = msg
+      #     wait = false
+      #     next
+      #   end
+
+      #   node_name = msg.properties.state.node
+      #   am_con.request([:nodes]) do |n_msg|
+      #     nodes = n_msg.read_property("nodes")[:resources]
+      #     node = nil
+      #     nodes.each do |n|
+      #       if n[:resource][:name].to_s == node_name.to_s
+      #         node = n
+      #         break
+      #       end
+      #     end
+
+      #     lease = nil
+      #     if node.nil?
+      #       error "AUTH error: Node nill"
+      #       msg.properties.state.error_msg = "Wrong node name."
+      #       result = msg
+      #       wait = false
+      #       next
+      #     else
+      #       am_con.request([:leases]) do |l_msg|
+      #         leases = l_msg.read_property("leases")[:resources]
+      #         leases.each do |l|
+      #           if Time.parse(l[:resource][:valid_from]) <= Time.now && Time.parse(l[:resource][:valid_until]) >= Time.now
+      #             unless l[:resource][:components].nil?
+      #               l[:resource][:components].each do |c|
+      #                 if c[:component][:name] == node_name.to_s && l[:resource][:account][:name] == acc
+      #                   lease = l
+      #                   break #found the correct lease
+      #                 end
+      #               end
+      #             end
+      #           end
+      #         end
+
+      #         if lease.nil? #if lease is nil it means no matching lease is found
+      #           error "AUTH error: Lease nill"
+      #           msg.properties.state.error_msg = "Node is not leased by your account."
+      #           result = msg
+      #           wait = false
+      #           next
+      #         else
+      #           debug "AUTH PASSED"
+      #           msg.properties.state.node = node
+      #           result = msg
+      #           wait = false
+      #           next
+      #         end
+      #       end
+      #     end
+      #   end
+      # end
+
+      # #waiting for the whole process to be completed
+      # while wait
+      #   sleep 1
+      # end
+
+      # return result if result
     else
       debug "AUTH PASSED"
       return msg

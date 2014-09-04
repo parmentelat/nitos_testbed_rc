@@ -40,7 +40,7 @@ module OmfRc::ResourceProxy::ImagezipClient #Imagezip client
       end
 
       nod = {}
-      nod[:node_name] = client.opts.node.resource.name
+      nod[:node_name] = client.opts.node.name
       client.opts.node.resource.interfaces.each do |i|
         if i[:role] == "control"
           nod[:node_ip] = i[:ip][:address]
@@ -49,7 +49,7 @@ module OmfRc::ResourceProxy::ImagezipClient #Imagezip client
           nod[:node_cm_ip] = i[:ip][:address]
         end
       end
-      nod[:node_cm_ip] = client.opts.node.resource.cmc.ip.address
+      nod[:node_cm_ip] = client.opts.node.cmc.ip.address
 
       client.property.app_id = client.hrn.nil? ? client.uid : client.hrn
 
