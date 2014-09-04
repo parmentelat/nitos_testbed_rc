@@ -27,7 +27,11 @@ module OmfRc::ResourceProxy::User
   end
 
   configure :auth_keys do |res, value|
-    File.open("/home/#{res.property.username}/.ssh/authorized_keys", 'w') do |file|
+    path = "/home/#{res.property.username}/.ssh"
+    unless File.directory?(path)#create the directory if it doesn't exist (it will never exist)
+      FileUtils.mkdir_p(path)
+    end
+    File.open("#{path}/authorized_keys", 'w') do |file|
       value.each do |v|
         file.puts v
       end
@@ -41,8 +45,65 @@ module OmfRc::ResourceProxy::User
   hook :after_initial_configured do |user|
     user.property.app_id = user.hrn.nil? ? user.uid : user.hrn
 
-    ExecApp.new(user.property.app_id, user.build_command_line, user.property.map_err_to_out) do |event_type, app_id, msg|
-      user.process_event(user, event_type, app_id, msg)
+    # ExecApp.new(user.property.app_id, user.build_command_line, user.property.map_err_to_out) do |event_type, app_id, msg|
+    #   user.process_event(user, event_type, app_id, msg)
+    # end
+    cmd = "#{user.property.binary_path} -m -s /bin/bash #{user.property.username}"
+    result = system(cmd)
+    if result
+      key = OpenSSL::PKey::RSA.new(2048)
+      pub_key = key.public_key
+      path = "/home/#{user.property.username}/.ssh/"
+      unless File.directory?(path)#create the directory if it doesn't exist (it will never exist)
+        FileUtils.mkdir_p(path)
+      end
+      File.write("#{path}/pub_key.pem", pub_key.to_pem)
+      File.write("#{path}/key.pem", key.to_pem)
+
+      user.inform(:status, {
+        status_type: 'APP_EVENT',
+        event: 'EXIT',
+        exit_code: 0,
+        msg: 'User created',
+        uid: user.uid, # do we really need this? Should be identical to 'src'
+        pub_key: pub_key
+      }, :ALL)
+    else #error returned
+      if $?.exitstatus == 9 #user already exists error
+        path = "/home/#{user.property.username}/.ssh/"
+
+        if File.exists?("#{path}/pub_key.pem") && File.exists?("#{path}/key.pem")#if keys exist just read the pub_key for the inform
+          file = File.open("#{path}/pub_key.pem", "rb")
+          pub_key = file.read
+          file.close
+        else
+          key = OpenSSL::PKey::RSA.new(2048)
+          pub_key = key.public_key
+          path = "/home/#{user.property.username}/.ssh/"
+          unless File.directory?(path)#create the directory if it doesn't exist (it will never exist)
+            FileUtils.mkdir_p(path)
+          end
+          File.write("#{path}/pub_key.pem", pub_key.to_pem)
+          File.write("#{path}/key.pem", key.to_pem)
+        end
+        user.inform(:status, {
+          status_type: 'APP_EVENT',
+          event: 'EXIT',
+          exit_code: 0,
+          msg: 'User already exists, ssh keys created.',
+          uid: user.uid, # do we really need this? Should be identical to 'src'
+          pub_key: pub_key
+        }, :ALL)
+      else
+        user.inform(:status, {
+          status_type: 'APP_EVENT',
+          event: 'EXIT',
+          exit_code: -1,
+          msg: 'User creation failed',
+          uid: user.uid, # do we really need this? Should be identical to 'src'
+          pub_key: pub_key
+        }, :ALL)
+      end
     end
   end
 
