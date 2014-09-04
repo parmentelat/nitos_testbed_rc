@@ -19,8 +19,8 @@ Gem::Specification.new do |s|
   s.require_paths = ["lib"]
 
   # specify any dependencies here; for example:
-  s.add_runtime_dependency "omf_common", "~> 6.1.2.pre.5"
-  s.add_runtime_dependency "omf_rc", "~> 6.1.2.pre.5"
+  s.add_runtime_dependency "omf_common", "~> 6.1.3"
+  s.add_runtime_dependency "omf_rc", "~> 6.1.3"
   s.add_runtime_dependency "nokogiri", "~> 1.6.0"
   s.add_development_dependency "net-ssh", "~> 2.8.0"
 end
