@@ -286,6 +286,7 @@ module OmfRc::ResourceProxy::CMFactory
   work("start_node_pxe") do |res, node|
     resp = res.get_status(node)
     if resp == :on
+      node[:node_mac] = node[:node_mac].upcase.gsub(/:/, '-')
       symlink_name = "/tftpboot/pxelinux.cfg/01-#{node[:node_mac]}"
       if !File.exists?("#{symlink_name}")
         File.symlink("/tftpboot/pxelinux.cfg/omf-5.4", "#{symlink_name}")
