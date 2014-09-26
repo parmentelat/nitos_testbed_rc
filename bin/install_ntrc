@@ -18,17 +18,19 @@ unless File.directory?(log_path)
   FileUtils.mkdir_p(log_path)
 end
 
+puts "Installing configuration files."
 conf_files = []
 conf_files << "cm_proxy_conf.yaml"
 conf_files << "frisbee_proxy_conf.yaml"
 conf_files << "user_proxy_conf.yaml"
-# conf_files << "omf_script_conf.yaml"
+conf_files << "omf_script_conf.yaml"
 
 conf_files.each do |file|
   puts "Copying configuration file '#{gem_root}/etc/#{file}' to '#{config_path}'."
   FileUtils.cp "#{gem_root}/etc/#{file}", "#{config_path}/#{file}"
   FileUtils.chmod 0644, "#{config_path}/#{file}"
 end
+puts "All configuration files have been installed, browse folder '#{config_path}' to alternate them appropriatly."
 
 config_path = File.expand_path("~/.omf/etc")
 unless File.directory?(config_path)
