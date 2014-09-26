@@ -3,6 +3,10 @@
 require 'omf_rc'
 require 'omf_common'
 require 'yaml'
+require "net/https"
+require "uri"
+require "json"
+require 'time'
 
 $stdout.sync = true
 @config = YAML.load_file('/etc/nitos_testbed_rc/frisbee_proxy_conf.yaml')
@@ -53,8 +57,8 @@ class FrisbeePDP
           return msg# next
         end
 
-        node_name = msg.properties.state.node
-        broker = "https://10.64.44.12:8001"
+        node_name = msg.properties.node_topic
+        broker = @config[:broker_url]
 
         uri = URI.parse("#{broker}/resources/nodes?name=#{node_name}")
         http = Net::HTTP.new(uri.host, uri.port)

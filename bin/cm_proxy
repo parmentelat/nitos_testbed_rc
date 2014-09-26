@@ -54,7 +54,7 @@ class CmPDP
       end
 
       node_name = msg.properties.state.node
-      broker = "https://10.64.44.12:8001"
+      broker = @config[:broker_url]
 
       uri = URI.parse("#{broker}/resources/nodes?name=#{node_name}")
       http = Net::HTTP.new(uri.host, uri.port)
@@ -72,8 +72,8 @@ class CmPDP
 
       node = resp[:resource_response]
       if node.nil?
-        error "AUTH error: Node not found"
-        msg.properties.state.error_msg = "#{resp[:reason]} - code: '#{resp[:exception][:code]}'"
+        error "AUTH error: Node '#{node_name}' not found"
+        msg.properties.state.error_msg = "Node '#{node_name}' does not exist - code: '#{resp[:exception][:code]}'"
         return msg
       end
 
@@ -90,7 +90,7 @@ class CmPDP
 
       if lease.nil?
         error "AUTH error: node not available"
-        msg.properties.state.error_msg = "Node is not leased by your account."
+        msg.properties.state.error_msg = "Node '#{node_name}' is not leased by your account."
         return msg
       else
         debug "AUTH PASSED"
