@@ -7,7 +7,7 @@ module OmfRc::ResourceProxy::UserFactory
   register_proxy :user_factory
 
   configure :deluser do |res, value|
-    cmd = 'userdel -r ' + value[:username]
+    cmd = '/usr/sbin/userdel -r -f ' + value[:username]
     system cmd
   end
 end
