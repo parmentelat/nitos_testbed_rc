@@ -9,6 +9,9 @@
   :entity_cert: /root/.omf/frisbee_factory.pem
   :entity_key: /root/.omf/frisbee_factory.pkey
 
+# URL for the rest interface of the broker
+:broker_url: https://nitlab.inf.uth.gr:8001 
+
 #operation Mode for OmfCommon.init (development, production, etc)
 :operationMode: development
 

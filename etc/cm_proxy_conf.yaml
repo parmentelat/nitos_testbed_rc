@@ -9,9 +9,14 @@
   :entity_cert: /root/.omf/cm_factory.pem
   :entity_key: /root/.omf/cm_factory.pkey
 
+# URL for the rest interface of the broker
+:broker_url: https://nitlab.inf.uth.gr:8001 
+
 #time (in seconds) before timeout error occurs
 :timeout: 80
+
 #operation mode for OmfCommon.init (development, production, etc)
 :operationMode: development
+
 #testbed xmpp topic
 :testbedTopic: am_controller
