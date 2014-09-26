@@ -41,7 +41,7 @@ module OmfRc::ResourceProxy::ImagezipClient #Imagezip client
 
       nod = {}
       nod[:node_name] = client.opts.node.name
-      client.opts.node.resource.interfaces.each do |i|
+      client.opts.node.interfaces.each do |i|
         if i[:role] == "control"
           nod[:node_ip] = i[:ip][:address]
           nod[:node_mac] = i[:mac]
@@ -56,18 +56,20 @@ module OmfRc::ResourceProxy::ImagezipClient #Imagezip client
       command = "#{client.property.binary_path} -o -z1 #{client.property.hardrive} - | /bin/nc -q 0 #{client.property.ip} #{client.property.port}"
       debug "Executing command #{command}"
   #     nod = {node_name: "node1", node_ip: "10.0.0.1", node_mac: "00-03-1d-0d-4b-96", node_cm_ip: "10.0.0.101"}
-
+      summary = ''
       host = Net::Telnet.new("Host" => nod[:node_ip], "Timeout" => false)#, "Prompt" => /[\w().-]*[\$#>:.]\s?(?:\(enable\))?\s*$/)
       host.cmd(command.to_s) do |c|
-        if c.to_s !=  "\n" && c[0,5] != "\n/usr" && c.to_s != "." && c.to_s != ".." && c.to_s != "..."
-          #puts '__' + c.to_s + '__'
-          client.inform(:status, {
-            status_type: 'IMAGEZIP',
-            event: "STDOUT",
-            app: client.property.app_id,
-            node: client.property.node_topic,
-            msg: "#{c.to_s}"
-          }, :ALL)
+        # if c.to_s !=  "\n" && c[0,5] != "\n/usr" && c.to_s != "." && c.to_s != ".." && c.to_s != "..."
+          # puts '---------(' + c.to_s + ')-----------'
+        if c.include? 'compressed'
+          summary = c
+          # client.inform(:status, {
+          #   status_type: 'IMAGEZIP',
+          #   event: "STDOUT",
+          #   app: client.property.app_id,
+          #   node: client.property.node_topic,
+          #   msg: "#{c.to_s}"
+          # }, :ALL)
         end
       end
 
@@ -76,7 +78,7 @@ module OmfRc::ResourceProxy::ImagezipClient #Imagezip client
         event: "EXIT",
         app: client.property.app_id,
         node: client.property.node_topic,
-        msg: 'imagezip client completed.'
+        msg: summary
       }, :ALL)
       host.close
     end

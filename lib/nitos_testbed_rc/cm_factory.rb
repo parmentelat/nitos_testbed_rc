@@ -53,65 +53,6 @@ module OmfRc::ResourceProxy::CMFactory
     end
   end
 
-  work("wait_until_ping") do |res, ip|
-    t = 0
-    resp = false
-    loop do
-      sleep 2
-      status = system("ping #{ip} -c 2 -w 2")
-      if t < @timeout
-        if status == true
-          resp = true
-          break
-        end
-      else
-        resp = false
-        break
-      end
-      t += 2
-    end
-    resp
-  end
-
-  work("wait_until_no_ping") do |res, ip|
-    t = 0
-    resp = false
-    loop do
-      sleep 2
-      status = system("ping #{ip} -c 2 -w 2")
-      if t < @timeout
-        if status == false
-          resp = true
-          break
-        end
-      else
-        resp = false
-        break
-      end
-      t += 2
-    end
-    resp
-  end
-
-  #this is used by other methods in this scope
-  work("get_status") do |res, node|
-    debug "http://#{node[:node_cm_ip].to_s}/state"
-    doc = Nokogiri::XML(open("http://#{node[:node_cm_ip].to_s}/state"))
-    resp = doc.xpath("//Response//line//value").text.strip
-    debug "state response: #{resp}"
-
-    if resp == 'on'
-      symlink_name = "/tftpboot/pxelinux.cfg/01-#{node[:node_mac]}"
-      if File.exists?("#{symlink_name}")
-        :on_pxe
-      else
-        :on
-      end
-    elsif resp == 'off'
-      :off
-    end
-  end
-
   #this is used by the get status call
   work("status") do |res, node|
     debug "Status url: http://#{node[:node_cm_ip].to_s}/state"
@@ -127,14 +68,22 @@ module OmfRc::ResourceProxy::CMFactory
       next
     end
 
+    ans = doc.xpath("//Response//line//value").text
+    ans.strip!
+
     res.inform(:status, {
-      current: "#{doc.xpath("//Response//line//value").text}",
+      current: "#{ans}",
       node_name: "#{node[:node_name].to_s}"
     }, :ALL)
     sleep 1 #this solves the getting stuck problem.
   end
 
   work("start_node") do |res, node, wait|
+    node[:node_mac] = node[:node_mac].downcase.gsub(/:/, '-')
+    symlink_name = "/tftpboot/pxelinux.cfg/01-#{node[:node_mac]}"
+    if File.exists?(symlink_name)
+      File.delete(symlink_name)
+    end
     debug "Start_node url: http://#{node[:node_cm_ip].to_s}/on"
     begin
       doc = Nokogiri::XML(open("http://#{node[:node_cm_ip].to_s}/on"))
@@ -143,15 +92,24 @@ module OmfRc::ResourceProxy::CMFactory
         event_type: "HTTP",
         exit_code: "-1",
         node_name: "#{node[:node_name].to_s}",
-        msg: "failed to reach cm, ip: #{node[:node_cm_ip].to_s}."
+        msg: "#{node[:name]} failed to reach cm, ip: #{node[:node_cm_ip].to_s}."
       }, :ALL)
       next
     end
 
-    if doc.xpath("//Response").text == 'ok'
+    ans = doc.xpath("//Response").text
+    ans.strip!
+
+    if ans == 'ok'
       res.inform(:status, {
         node_name: "#{node[:node_name].to_s}",
         current: :booting,
+        desired: :running
+      }, :ALL)
+    elsif ans == 'already on'
+      res.inform(:status, {
+        node_name: "#{node[:node_name].to_s}",
+        current: :running,
         desired: :running
       }, :ALL)
     end
@@ -176,6 +134,11 @@ module OmfRc::ResourceProxy::CMFactory
   end
 
   work("stop_node") do |res, node, wait|
+    node[:node_mac] = node[:node_mac].downcase.gsub(/:/, '-')
+    symlink_name = "/tftpboot/pxelinux.cfg/01-#{node[:node_mac]}"
+    if File.exists?(symlink_name)
+      File.delete(symlink_name)
+    end
     begin
       debug "Shutting down node '#{node[:node_name]}' through ssh."
       ssh = Net::SSH.start(node[:node_ip], 'root')#, :password => @password)
@@ -192,10 +155,20 @@ module OmfRc::ResourceProxy::CMFactory
         debug "ssh failed, using CM card instead."
         debug "Stop_node url: http://#{node[:node_cm_ip].to_s}/off"
         doc = Nokogiri::XML(open("http://#{node[:node_cm_ip].to_s}/off"))
-        if doc.xpath("//Response").text == 'ok'
+
+        ans = doc.xpath("//Response").text
+        ans.strip!
+
+        if ans == 'ok'
           res.inform(:status, {
               node_name: "#{node[:node_name].to_s}",
               current: :running,
+              desired: :stopped
+          }, :ALL)
+        elsif ans == 'already off'
+          res.inform(:status, {
+              node_name: "#{node[:node_name].to_s}",
+              current: :stopped,
               desired: :stopped
           }, :ALL)
         end
@@ -230,6 +203,11 @@ module OmfRc::ResourceProxy::CMFactory
   end
 
   work("reset_node") do |res, node, wait|
+    node[:node_mac] = node[:node_mac].downcase.gsub(/:/, '-')
+    symlink_name = "/tftpboot/pxelinux.cfg/01-#{node[:node_mac]}"
+    if File.exists?(symlink_name)
+      File.delete(symlink_name)
+    end
     begin
       debug "Rebooting node '#{node[:node_name]}' through ssh."
       ssh = Net::SSH.start(node[:node_ip], 'root')#, :password => @password)
@@ -249,7 +227,7 @@ module OmfRc::ResourceProxy::CMFactory
         if doc.xpath("//Response").text == 'ok'
           res.inform(:status, {
               node_name: "#{node[:node_name].to_s}",
-              current: :running,
+              current: :resetted,
               desired: :resetted
           }, :ALL)
         end
@@ -285,8 +263,8 @@ module OmfRc::ResourceProxy::CMFactory
 
   work("start_node_pxe") do |res, node|
     resp = res.get_status(node)
+    node[:node_mac] = node[:node_mac].downcase.gsub(/:/, '-')
     if resp == :on
-      node[:node_mac] = node[:node_mac].upcase.gsub(/:/, '-')
       symlink_name = "/tftpboot/pxelinux.cfg/01-#{node[:node_mac]}"
       if !File.exists?("#{symlink_name}")
         File.symlink("/tftpboot/pxelinux.cfg/omf-5.4", "#{symlink_name}")
@@ -342,6 +320,11 @@ module OmfRc::ResourceProxy::CMFactory
         desired: :pxe_on
       }, :ALL)
     else
+      node[:node_mac] = node[:node_mac].downcase.gsub(/:/, '-')
+      symlink_name = "/tftpboot/pxelinux.cfg/01-#{node[:node_mac]}"
+      if File.exists?(symlink_name)
+        File.delete(symlink_name)
+      end
       res.inform(:error, {
         event_type: "TIME_OUT",
         exit_code: "-1",
@@ -353,6 +336,7 @@ module OmfRc::ResourceProxy::CMFactory
   end
 
   work("start_node_pxe_off") do |res, node, action|
+    node[:node_mac] = node[:node_mac].downcase.gsub(/:/, '-')
     symlink_name = "/tftpboot/pxelinux.cfg/01-#{node[:node_mac]}"
     if File.exists?(symlink_name)
       File.delete(symlink_name)
@@ -416,5 +400,66 @@ module OmfRc::ResourceProxy::CMFactory
       end
     end
     sleep 1
+  end
+
+  #this is used by other methods in this scope
+  work("wait_until_ping") do |res, ip|
+    t = 0
+    resp = false
+    loop do
+      sleep 2
+      status = system("ping #{ip} -c 2 -w 2")
+      if t < @timeout
+        if status == true
+          resp = true
+          break
+        end
+      else
+        resp = false
+        break
+      end
+      t += 2
+    end
+    resp
+  end
+
+  #this is used by other methods in this scope
+  work("wait_until_no_ping") do |res, ip|
+    t = 0
+    resp = false
+    loop do
+      sleep 2
+      status = system("ping #{ip} -c 2 -w 2")
+      if t < @timeout
+        if status == false
+          resp = true
+          break
+        end
+      else
+        resp = false
+        break
+      end
+      t += 2
+    end
+    resp
+  end
+
+  #this is used by other methods in this scope
+  work("get_status") do |res, node|
+    debug "http://#{node[:node_cm_ip].to_s}/state"
+    doc = Nokogiri::XML(open("http://#{node[:node_cm_ip].to_s}/state"))
+    resp = doc.xpath("//Response//line//value").text.strip
+    debug "state response: #{resp}"
+
+    if resp == 'on'
+      symlink_name = "/tftpboot/pxelinux.cfg/01-#{node[:node_mac]}"
+      if File.exists?("#{symlink_name}")
+        :on_pxe
+      else
+        :on
+      end
+    elsif resp == 'off'
+      :off
+    end
   end
 end

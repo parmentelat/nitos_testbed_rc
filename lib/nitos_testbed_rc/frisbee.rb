@@ -41,7 +41,7 @@ module OmfRc::ResourceProxy::Frisbee #frisbee client
       end
       nod = {}
       nod[:node_name] = client.opts.node.name
-      client.opts.node.resource.interfaces.each do |i|
+      client.opts.node.interfaces.each do |i|
         if i[:role] == "control"
           nod[:node_ip] = i[:ip][:address]
           nod[:node_mac] = i[:mac]
@@ -55,10 +55,11 @@ module OmfRc::ResourceProxy::Frisbee #frisbee client
       command = "#{client.property.binary_path} -i #{client.property.multicast_interface} -m #{client.property.multicast_address} -p #{client.property.port} #{client.property.hardrive}"
       debug "Executing command #{command}"
 
+      output = ''
       host = Net::Telnet.new("Host" => client.property.multicast_interface.to_s, "Timeout" => 200, "Prompt" => /[\w().-]*[\$#>:.]\s?(?:\(enable\))?\s*$/)
       host.cmd(command.to_s) do |c|
-        if c !=  "\n" && (c[0,8] == "Progress" || c[0,5] == "Wrote")
-          c = c.sub("\n","\n#{client.property.node_topic}: ")
+        if c[0,8] ==  "Progress"
+          c = c.split[1]
           client.inform(:status, {
             status_type: 'FRISBEE',
             event: "STDOUT",
@@ -66,6 +67,12 @@ module OmfRc::ResourceProxy::Frisbee #frisbee client
             node: client.property.node_topic,
             msg: "#{c.to_s}"
           }, :ALL)
+        elsif c[0,5] == "Wrote"
+          c = c.split("\n")
+          output = "#{c.first}\n#{c.last}"
+        elsif c[0,6] == "\nWrote"
+          c = c.split("\n")
+          output = "#{c[1]}\n#{c.last}"
         end
       end
 
@@ -74,7 +81,7 @@ module OmfRc::ResourceProxy::Frisbee #frisbee client
         event: "EXIT",
         app: client.property.app_id,
         node: client.property.node_topic,
-        msg: 'frisbee client completed.'
+        msg: output
       }, :ALL)
       host.close
     end

@@ -25,6 +25,8 @@ module OmfRc::ResourceProxy::ImagezipServer #Imagezip server
 
   hook :after_initial_configured do |server|
     server.property.app_id = server.hrn.nil? ? server.uid : server.hrn
+    server.property.image_name = server.property.image_name.nil? ? @fconf[:imageDir] + '/' + @fconf[:defaultImage] : server.property.image_name
+    server.property.image_name = server.property.image_name.start_with?('/') ? server.property.image_name : @fconf[:imageDir] + '/' + server.property.image_name
 
     @app = ExecApp.new(server.property.app_id, server.build_command_line, server.property.map_err_to_out) do |event_type, app_id, msg|
       server.process_event(server, event_type, app_id, msg)
@@ -36,10 +38,10 @@ module OmfRc::ResourceProxy::ImagezipServer #Imagezip server
   end
 
   def process_event(res, event_type, app_id, msg)
-      logger.info "Frisbeed: App Event from '#{app_id}' - #{event_type}: '#{msg}'"
+      logger.info "ImagezipServer: App Event from '#{app_id}' - #{event_type}: '#{msg}'"
       if event_type == 'EXIT' #maybe i should inform you for every event_type, we'll see.
         res.inform(:status, {
-          status_type: 'IMAGEZIP',
+          status_type: 'IMAGEZIP_SERVER',
           event: event_type.to_s.upcase,
           app: app_id,
           exit_code: msg,
@@ -47,7 +49,7 @@ module OmfRc::ResourceProxy::ImagezipServer #Imagezip server
         }, :ALL)
       elsif event_type == 'STDOUT'
         res.inform(:status, {
-          status_type: 'IMAGEZIP',
+          status_type: 'IMAGEZIP_SERVER',
           event: event_type.to_s.upcase,
           app: app_id,
           exit_code: msg,
