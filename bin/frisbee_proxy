@@ -92,6 +92,12 @@ class FrisbeePDP
           end
         end
 
+        if acc == 'root'
+          debug "AUTH PASSED"
+          msg.properties.state.node = node
+          return msg
+        end
+
         if lease.nil?
           error "AUTH error: node not available"
           msg.properties.error_msg = "Node is not leased by your account."

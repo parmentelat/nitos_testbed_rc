@@ -77,6 +77,12 @@ class CmPDP
         return msg
       end
 
+      if acc == 'root'
+        debug "AUTH PASSED"
+        msg.properties.state.node = node[:resources].first
+        return msg
+      end
+
       node = node[:resources].first
       lease = nil
       node[:leases].each do |l|
