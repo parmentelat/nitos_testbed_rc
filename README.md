@@ -161,7 +161,21 @@ Change configuration file '~/.omf/etc/user_proxy_conf.yaml', which is related to
 Run proxies
 -----------
 
-You can execute all proxies with one command:
+To start/stop/restart the upstart service of nitos_testbed_rc use:
+
+    % start ntrc 
+    % stop ntrc
+    % restart ntrc
+
+Starting ntrc as an upstart will generate the following log files:
+
+- user rc: /var/log/upstart/ntrc_user.log
+
+- frisbee rc: /var/log/upstart/ntrc_frisbee.log
+
+- cm rc: /var/log/upstart/ntrc_cm.log
+
+Alternatively (mostly for debugging reasons) you can execute all proxies with one command:
 
     % run_proxies
 
