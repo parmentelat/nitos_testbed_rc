@@ -169,8 +169,8 @@ module OmfRc::ResourceProxy::User
           }, :ALL)
         else #if msg!=0 then the application failed to complete
           path = "/home/#{res.property.username}/.ssh/"
-          if File.exists?("#{path}/pub_key.pem") && File.exists?("#{path}/key.pem")#if keys exist just read the pub_key for the inform
-            file = File.open("#{path}/pub_key.pem", "rb")
+          if File.exists?("#{path}/id_rsa.pub") && File.exists?("#{path}/id_rsa")#if keys exist just read the pub_key for the inform
+            file = File.open("#{path}/id_rsa.pub", "rb")
             pub_key = file.read
             file.close
           else #if keys do not exist create them and then inform
@@ -183,7 +183,9 @@ module OmfRc::ResourceProxy::User
               FileUtils.mkdir_p(path)
             end
 
-            File.write("#{path}/id_rsa.pub", pub_key.to_pem)
+            pub_key = pub_key.to_pem
+
+            File.write("#{path}/id_rsa.pub", pub_key)
             File.write("#{path}/id_rsa", key.to_pem)
           end
           res.inform(:status, {
@@ -193,7 +195,7 @@ module OmfRc::ResourceProxy::User
             exit_code: msg,
             msg: msg,
             uid: res.uid, # do we really need this? Should be identical to 'src'
-            pub_key: pub_key.to_pem
+            pub_key: pub_key
           }, :ALL)
         end
       else
