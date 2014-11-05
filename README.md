@@ -35,7 +35,8 @@ Use omf_cert.rb script to generate the following certificates and place them on 
     % mkdir /root/.omf/trusted_roots
     % cd /root/.omf
 
-Create a root certificate (change DOMAIN)
+Create a root certificate (change DOMAIN).
+Importand!!! If you already have a root certificate (probably created while installing omf_sfa) DO NOT create this certificate again and use the old one instead.
 
     % ruby omf_cert.rb --email root@DOMAIN -o /root/.omf/trusted_roots/root.pem --duration 5000000 create_root
 
@@ -49,7 +50,7 @@ Create a certificate for cm_proxy of NTRC (change DOMAIN, XMPP_DOMAIN and if you
 
 Create a certificate for frisbee_proxy of NTRC (change DOMAIN, XMPP_DOMAIN and if you wish the output file names).
 
-    % ruby omf_cert.rb -o cm_factory.pem --email cm_factory@DOMAIN --resource-type cm_factory --resource-id xmpp://cm_factory@XMPP_DOMAIN --root /root/.omf/trusted_roots/root.pem --duration 50000000 create_resource
+    % ruby omf_cert.rb -o frisbee_factory.pem --email frisbee_factory@DOMAIN --resource-type frisbee_factory --resource-id xmpp://frisbee_factory@XMPP_DOMAIN --root /root/.omf/trusted_roots/root.pem --duration 50000000 create_resource
 
 Create a certificate for the omf6 script, this certificate is inside the directory '~/.omf', every user of the testbed should have his own certificate in order to use omf6 script (change DOMAIN, USERNAME and if you wish the output file names).
 
