@@ -83,7 +83,7 @@ class FrisbeePDP
 
         if acc == 'root'
           debug "AUTH PASSED"
-          msg.properties.state.node = node
+          msg.properties.node = node
           return msg
         end
 
