@@ -85,12 +85,14 @@ class CmPDP
 
       node = node[:resources].first
       lease = nil
-      node[:leases].each do |l|
-        l = l[:lease]
-        next if l[:account][:name] != acc
-        if Time.parse(l[:valid_from]) <= Time.now && Time.parse(l[:valid_until]) >= Time.now
-          lease = l
-          break
+      unless node[:leases].nil?
+        node[:leases].each do |l|
+          l = l[:lease]
+          next if l[:account][:name] != acc
+          if Time.parse(l[:valid_from]) <= Time.now && Time.parse(l[:valid_until]) >= Time.now
+            lease = l
+            break
+          end
         end
       end
 

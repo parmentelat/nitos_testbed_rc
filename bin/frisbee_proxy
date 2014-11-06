@@ -81,21 +81,23 @@ class FrisbeePDP
           return msg
         end
 
-        node = node[:resources].first
-        lease = nil
-        node[:leases].each do |l|
-          l = l[:lease]
-          next if l[:account][:name] != acc
-          if Time.parse(l[:valid_from]) <= Time.now && Time.parse(l[:valid_until]) >= Time.now
-            lease = l
-            break
-          end
-        end
-
         if acc == 'root'
           debug "AUTH PASSED"
           msg.properties.state.node = node
           return msg
+        end
+
+        node = node[:resources].first
+        lease = nil
+        unless node[:leases].nil?
+          node[:leases].each do |l|
+            l = l[:lease]
+            next if l[:account][:name] != acc
+            if Time.parse(l[:valid_from]) <= Time.now && Time.parse(l[:valid_until]) >= Time.now
+              lease = l
+              break
+            end
+          end
         end
 
         if lease.nil?
