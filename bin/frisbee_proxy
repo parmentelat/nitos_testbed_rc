@@ -81,13 +81,13 @@ class FrisbeePDP
           return msg
         end
 
+        node = node[:resources].first
         if acc == 'root'
           debug "AUTH PASSED"
           msg.properties.node = node
           return msg
         end
 
-        node = node[:resources].first
         lease = nil
         unless node[:leases].nil?
           node[:leases].each do |l|
