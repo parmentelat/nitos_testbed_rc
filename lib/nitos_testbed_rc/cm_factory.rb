@@ -267,7 +267,7 @@ module OmfRc::ResourceProxy::CMFactory
     if resp == :on
       symlink_name = "/tftpboot/pxelinux.cfg/01-#{node[:node_mac]}"
       if !File.exists?("#{symlink_name}")
-        File.symlink("/tftpboot/pxelinux.cfg/omf-5.4", "#{symlink_name}")
+        File.symlink("/tftpboot/pxelinux.cfg/#{@config[:pxeSymLinkConfFile]}", "#{symlink_name}")
       end
       debug "Start_node_pxe RESET: http://#{node[:node_cm_ip].to_s}/reset"
       begin
@@ -284,7 +284,7 @@ module OmfRc::ResourceProxy::CMFactory
     elsif resp == :off
       symlink_name = "/tftpboot/pxelinux.cfg/01-#{node[:node_mac]}"
       if !File.exists?("#{symlink_name}")
-        File.symlink("/tftpboot/pxelinux.cfg/omf-5.4", "#{symlink_name}")
+        File.symlink("/tftpboot/pxelinux.cfg/#{@config[:pxeSymLinkConfFile]}", "#{symlink_name}")
       end
       debug "Start_node_pxe ON: http://#{node[:node_cm_ip].to_s}/on"
       begin

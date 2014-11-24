@@ -41,6 +41,7 @@
   :frisbeedBin: /usr/sbin/frisbeed
   :frisbeeBin: /usr/sbin/frisbee
   :imagezipClientBin: /usr/bin/imagezip
+  :imagezipClientNC: /bin/nc
   :imagezipServerBin: /bin/nc
 
   # Local interface to bind to for frisbee traffic

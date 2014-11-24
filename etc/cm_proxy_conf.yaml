@@ -15,6 +15,9 @@
 #time (in seconds) before timeout error occurs
 :timeout: 80
 
+#time (in seconds) before timeout error occurs
+:pxeSymLinkConfFile: omf-5.4
+
 #operation mode for OmfCommon.init (development, production, etc)
 :operationMode: development
 
