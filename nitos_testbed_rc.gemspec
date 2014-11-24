@@ -23,5 +23,5 @@ Gem::Specification.new do |s|
   s.add_runtime_dependency "omf_rc", "~> 6.1.3"
   s.add_runtime_dependency "nokogiri", "~> 1.6.0"
   s.add_runtime_dependency "progress_bar", "~> 1.0.3"
-  s.add_development_dependency "net-ssh", "~> 2.8.0"
+  s.add_runtime_dependency "net-ssh", "~> 2.8.0"
 end
