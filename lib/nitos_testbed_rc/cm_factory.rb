@@ -57,7 +57,7 @@ module OmfRc::ResourceProxy::CMFactory
   work("status") do |res, node|
     debug "Status url: http://#{node[:node_cm_ip].to_s}/state"
     begin
-      doc = Nokogiri::XML(open("http://#{node[:node_cm_ip].to_s}/state"))
+      resp = open("http://#{node[:node_cm_ip].to_s}/state")
     rescue
       res.inform(:error, {
         event_type: "HTTP",
@@ -67,9 +67,7 @@ module OmfRc::ResourceProxy::CMFactory
       }, :ALL)
       next
     end
-
-    ans = doc.xpath("//Response//line//value").text
-    ans.strip!
+    ans = res.parse_responce(resp, "//Response//line//value")
 
     res.inform(:status, {
       current: "#{ans}",
@@ -86,7 +84,7 @@ module OmfRc::ResourceProxy::CMFactory
     end
     debug "Start_node url: http://#{node[:node_cm_ip].to_s}/on"
     begin
-      doc = Nokogiri::XML(open("http://#{node[:node_cm_ip].to_s}/on"))
+      resp = open("http://#{node[:node_cm_ip].to_s}/on")
     rescue
       res.inform(:error, {
         event_type: "HTTP",
@@ -97,8 +95,7 @@ module OmfRc::ResourceProxy::CMFactory
       next
     end
 
-    ans = doc.xpath("//Response").text
-    ans.strip!
+    ans = res.parse_responce(resp, "//Response")
 
     if ans == 'ok'
       res.inform(:status, {
@@ -154,10 +151,20 @@ module OmfRc::ResourceProxy::CMFactory
       begin
         debug "ssh failed, using CM card instead."
         debug "Stop_node url: http://#{node[:node_cm_ip].to_s}/off"
-        doc = Nokogiri::XML(open("http://#{node[:node_cm_ip].to_s}/off"))
 
-        ans = doc.xpath("//Response").text
-        ans.strip!
+        begin
+          resp = open("http://#{node[:node_cm_ip].to_s}/off")
+        rescue
+          res.inform(:error, {
+            event_type: "HTTP",
+            exit_code: "-1",
+            node_name: "#{node[:node_name].to_s}",
+            msg: "#{node[:name]} failed to reach cm, ip: #{node[:node_cm_ip].to_s}."
+          }, :ALL)
+          next
+        end
+
+        ans = res.parse_responce(resp, "//Response")
 
         if ans == 'ok'
           res.inform(:status, {
@@ -223,8 +230,20 @@ module OmfRc::ResourceProxy::CMFactory
       begin
         debug "ssh failed, using CM card instead."
         debug "Reset_node url: http://#{node[:node_cm_ip].to_s}/reset"
-        doc = Nokogiri::XML(open("http://#{node[:node_cm_ip].to_s}/reset"))
-        if doc.xpath("//Response").text == 'ok'
+        begin
+          resp = open("http://#{node[:node_cm_ip].to_s}/reset")
+        rescue
+          res.inform(:error, {
+            event_type: "HTTP",
+            exit_code: "-1",
+            node_name: "#{node[:node_name].to_s}",
+            msg: "#{node[:name]} failed to reach cm, ip: #{node[:node_cm_ip].to_s}."
+          }, :ALL)
+          next
+        end
+
+        ans = res.parse_responce(resp, "//Response")
+        if ans == 'ok'
           res.inform(:status, {
               node_name: "#{node[:node_name].to_s}",
               current: :resetted,
@@ -271,7 +290,7 @@ module OmfRc::ResourceProxy::CMFactory
       end
       debug "Start_node_pxe RESET: http://#{node[:node_cm_ip].to_s}/reset"
       begin
-        doc = Nokogiri::XML(open("http://#{node[:node_cm_ip].to_s}/reset"))
+        open("http://#{node[:node_cm_ip].to_s}/reset")
       rescue
         res.inform(:error, {
           event_type: "HTTP",
@@ -288,7 +307,7 @@ module OmfRc::ResourceProxy::CMFactory
       end
       debug "Start_node_pxe ON: http://#{node[:node_cm_ip].to_s}/on"
       begin
-        doc = Nokogiri::XML(open("http://#{node[:node_cm_ip].to_s}/on"))
+        open("http://#{node[:node_cm_ip].to_s}/on")
       rescue
         res.inform(:error, {
           event_type: "HTTP",
@@ -301,7 +320,7 @@ module OmfRc::ResourceProxy::CMFactory
     elsif resp == :started_on_pxe
       debug "Start_node_pxe STARTED: http://#{node[:node_cm_ip].to_s}/reset"
       begin
-        doc = Nokogiri::XML(open("http://#{node[:node_cm_ip].to_s}/reset"))
+        open("http://#{node[:node_cm_ip].to_s}/reset")
       rescue
         res.inform(:error, {
           event_type: "HTTP",
@@ -344,7 +363,7 @@ module OmfRc::ResourceProxy::CMFactory
     if action == "reset"
       debug "Start_node_pxe_off RESET: http://#{node[:node_cm_ip].to_s}/reset"
       begin
-        doc = Nokogiri::XML(open("http://#{node[:node_cm_ip].to_s}/reset"))
+        open("http://#{node[:node_cm_ip].to_s}/reset")
       rescue
         res.inform(:error, {
           event_type: "HTTP",
@@ -373,7 +392,7 @@ module OmfRc::ResourceProxy::CMFactory
     elsif action == "shutdown"
       debug "Start_node_pxe_off SHUTDOWN: http://#{node[:node_cm_ip].to_s}/off"
       begin
-        doc = Nokogiri::XML(open("http://#{node[:node_cm_ip].to_s}/off"))
+        open("http://#{node[:node_cm_ip].to_s}/off")
       rescue
         res.inform(:error, {
           event_type: "HTTP",
@@ -447,8 +466,8 @@ module OmfRc::ResourceProxy::CMFactory
   #this is used by other methods in this scope
   work("get_status") do |res, node|
     debug "http://#{node[:node_cm_ip].to_s}/state"
-    doc = Nokogiri::XML(open("http://#{node[:node_cm_ip].to_s}/state"))
-    resp = doc.xpath("//Response//line//value").text.strip
+    resp = open("http://#{node[:node_cm_ip].to_s}/state")
+    resp = res.parse_responce(resp, "//Response//line//value")
     debug "state response: #{resp}"
 
     if resp == 'on'
@@ -461,5 +480,15 @@ module OmfRc::ResourceProxy::CMFactory
     elsif resp == 'off'
       :off
     end
+  end
+
+  work("parse_responce") do |res, input, path|
+    input = input.string if input.kind_of? StringIO
+    if input[0] == "<"
+      output = Nokogiri::XML(input).xpath(path).text.strip
+    else
+      output = input.strip
+    end
+    output
   end
 end
