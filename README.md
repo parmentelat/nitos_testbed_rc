@@ -74,7 +74,7 @@ Important!!! If you already have a user_cert.pem certificate in folder /root/.om
 Configuration files
 -------------------
 
-Change configuration file '/etc/nitos_testbed/user_proxy_conf.yaml', which is related to user_proxy of NTRC. For example:
+Change configuration file '/etc/nitos_testbed_rc/user_proxy_conf.yaml', which is related to user_proxy of NTRC. For example:
 
     #xmpp details
     :xmpp:
@@ -89,7 +89,7 @@ Change configuration file '/etc/nitos_testbed/user_proxy_conf.yaml', which is re
     #operation mode for OmfCommon.init (development, production, etc)
     :operationMode: development 
 
-Change configuration file '/etc/nitos_testbed/cm_proxy_conf.yaml', which is related to cm_proxy of NTRC. For example:
+Change configuration file '/etc/nitos_testbed_rc/cm_proxy_conf.yaml', which is related to cm_proxy of NTRC. For example:
 
     #details to be used for the connection to the xmpp server
     :xmpp:
@@ -109,7 +109,7 @@ Change configuration file '/etc/nitos_testbed/cm_proxy_conf.yaml', which is rela
     #testbed xmpp topic
     :testbedTopic: am_controller
 
-Change configuration file '/etc/nitos_testbed/frisbee_proxy_conf.yaml', which is related to frisbee_proxy of NTRC. For example:
+Change configuration file '/etc/nitos_testbed_rc/frisbee_proxy_conf.yaml', which is related to frisbee_proxy of NTRC. For example:
     
     #xmpp details
     :xmpp:
