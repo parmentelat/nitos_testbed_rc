@@ -787,7 +787,7 @@ def shut_down(comm)
   comm.disconnect
 end
 
-OmfCommon.init(@config[:operationMode], communication: { url: "xmpp://#{@xmpp[:script_user]}:#{@xmpp[:password]}@#{@xmpp[:server]}", auth: {} }) do
+OmfCommon.init(@config[:operationMode], {communication: { url: "xmpp://#{@xmpp[:script_user]}:#{@xmpp[:password]}@#{@xmpp[:server]}", auth: {}}, logging: {}}) do
   OmfCommon.comm.on_connected do |comm|
     OmfCommon::Auth::CertificateStore.instance.register_default_certs(trusted_roots)
     entity.resource_id = OmfCommon.comm.local_topic.address
