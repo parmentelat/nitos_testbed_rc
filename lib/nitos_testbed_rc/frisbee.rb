@@ -39,6 +39,10 @@ module OmfRc::ResourceProxy::Frisbee #frisbee client
         }, :ALL)
         next
       end
+      if client.opts.ignore_msg
+        #just ignore this message, another resource controller should take care of this message
+        next
+      end
       nod = {}
       nod[:node_name] = client.opts.node.name
       client.opts.node.interfaces.each do |i|

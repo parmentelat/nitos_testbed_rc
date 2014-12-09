@@ -1,4 +1,4 @@
-#Imagezip client
+#Imagezip server
 #created by parent :frisbee_factory
 #used in save command
 
@@ -24,6 +24,14 @@ module OmfRc::ResourceProxy::ImagezipServer #Imagezip server
   property :image_name, :default => @fconf[:imageDir] + '/new_image.ndz'
 
   hook :after_initial_configured do |server|
+    debug "Received message '#{server.opts.inspect}'"
+    if error_msg = server.opts.error_msg
+      next
+    end
+    if server.opts.ignore_msg
+      #just ignore this message, another resource controller should take care of this message
+      next
+    end
     server.property.app_id = server.hrn.nil? ? server.uid : server.hrn
     server.property.image_name = server.property.image_name.nil? ? @fconf[:imageDir] + '/' + @fconf[:defaultImage] : server.property.image_name
     server.property.image_name = server.property.image_name.start_with?('/') ? server.property.image_name : @fconf[:imageDir] + '/' + server.property.image_name

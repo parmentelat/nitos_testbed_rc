@@ -69,8 +69,13 @@ class FrisbeePDP
         resp = JSON.parse(response.body, :symbolize_names => true)
 
         if response.header.code != '200'
-          error "AUTH error: empty response"
-          msg.properties.state.error_msg = "#{resp[:reason]} - code: '#{resp[:exception][:code]}'"
+          if resp[:exception] == "No resources matching the request."
+            error "AUTH error: Node '#{node_name}' does not exist."
+            msg.properties.state.error_msg = "Node #{node_name} does not exist."
+          else
+            error "AUTH error: empty response"
+            msg.properties.state.error_msg = "#{resp[:reason]} - code: '#{resp[:exception][:code]}'"
+          end
           return msg# next
         end
 
@@ -82,8 +87,15 @@ class FrisbeePDP
         end
 
         node = node[:resources].first
+
+        if @config[:testbedDomain] != "ALL" && node[:domain] != @config[:testbedDomain] 
+          debug "This node does not belong to the domain '#{@config[:testbedDomain]}'"
+          msg.properties.state.ignore_msg = true
+          return msg
+        end
+
         if acc == 'root'
-          debug "AUTH PASSED"
+          debug "AUTH PASSED (root account)"
           msg.properties.node = node
           return msg
         end

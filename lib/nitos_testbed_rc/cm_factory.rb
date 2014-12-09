@@ -28,6 +28,10 @@ module OmfRc::ResourceProxy::CMFactory
       }, :ALL)
       next
     end
+    if value.ignore_msg
+      #just ignore this message, another resource controller should take care of this message
+      next
+    end
     nod = {}
     nod[:node_name] = value.node[:name]
     value.node[:interfaces].each do |i|

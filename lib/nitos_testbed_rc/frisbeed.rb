@@ -28,6 +28,14 @@ module OmfRc::ResourceProxy::Frisbeed
 
 
   hook :after_initial_configured do |server|
+    debug "Received message '#{server.opts.inspect}'"
+    if error_msg = server.opts.error_msg
+      next
+    end
+    if server.opts.ignore_msg
+      #just ignore this message, another resource controller should take care of this message
+      next
+    end
     server.property.app_id = server.hrn.nil? ? server.uid : server.hrn
     server.property.image = server.property.image.nil? ? @fconf[:imageDir] + '/' + @fconf[:defaultImage] : server.property.image
     server.property.image = server.property.image.start_with?('/') ? server.property.image : @fconf[:imageDir] + '/' + server.property.image

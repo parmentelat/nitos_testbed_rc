@@ -65,8 +65,13 @@ class CmPDP
       resp = JSON.parse(response.body, :symbolize_names => true)
 
       if response.header.code != '200'
-        error "AUTH error: empty response"
-        msg.properties.state.error_msg = "#{resp[:reason]} - code: '#{resp[:exception][:code]}'"
+        if resp[:exception][:reason] == "No resources matching the request."
+          error "AUTH error: Node #{node_name} does not exist."
+          msg.properties.state.error_msg = "Node '#{node_name}' does not exist."
+        else
+          error "AUTH error: empty response"
+          msg.properties.state.error_msg = "#{resp[:exception][:reason]} - code: '#{resp[:exception][:code]}'"
+        end
         return msg# next
       end
 
@@ -77,13 +82,21 @@ class CmPDP
         return msg
       end
 
-      if acc == 'root'
-        debug "AUTH PASSED"
-        msg.properties.state.node = node[:resources].first
+      node = node[:resources].first
+
+      if @config[:testbedDomain] != "ALL" && node[:domain] != @config[:testbedDomain] 
+        debug "This node does not belong to the domain '#{@config[:testbedDomain]}'"
+        msg.properties.state.ignore_msg = true
         return msg
       end
 
-      node = node[:resources].first
+      if acc == 'root'
+        debug "AUTH PASSED (root account)"
+        msg.properties.state.node = node
+        return msg
+      end
+
+      
       lease = nil
       unless node[:leases].nil?
         node[:leases].each do |l|
