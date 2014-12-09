@@ -21,7 +21,7 @@ Prerequirements
 
 Install frisbee, which is required by the frisbee proxy
 
-    % apt-get install frisbee
+    $ apt-get install frisbee
 
 If that fails add this line 'deb http://pkg.mytestbed.net/ubuntu precise/ ' to your /etc/apt/sources.list and then 'apt-get update'.
 
@@ -30,46 +30,48 @@ Installation
 
 First you need to install the gem
   
-    % gem install nitos_testbed_rc --pre
+    $ gem install nitos_testbed_rc --pre
 
 Then you need to run the install_ntrc script to generate the configuration files [tutorial](http://mytestbed.net/doc/omf/file.set_up_communication_server.html).
 
-    % install_ntrc
+    $ install_ntrc
 
 Create certificates
 -------------------
 
 Use omf_cert.rb script to generate the following certificates and place them on directories '/root/.omf' and /root/.omf.
 
-    % mkdir /root/.omf
-    % mkdir /root/.omf/trusted_roots
-    % cd /root/.omf
+    $ mkdir /root/.omf
+    $ mkdir /root/.omf/trusted_roots
+    $ cd /root/.omf
 
 Create a root certificate (change DOMAIN).
 
 Important!!! If you already have a root certificate (probably created while installing omf_sfa) DO NOT create this certificate again and use the old one instead.
 
-    % omf_cert.rb --email root@DOMAIN -o /root/.omf/trusted_roots/root.pem --duration 5000000 create_root
+    $ omf_cert.rb --email root@DOMAIN -o /root/.omf/trusted_roots/root.pem --duration 5000000 create_root
 
 Create a certificate for user_proxy of NTRC (change DOMAIN, XMPP_DOMAIN and if you wish the output file names).
 
-    % omf_cert.rb -o user_factory.pem --email user_factory@DOMAIN --resource-type user_factory --resource-id xmpp://user_factory@XMPP_DOMAIN --root /root/.omf/trusted_roots/root.pem --duration 50000000 create_resource
+    $ omf_cert.rb -o user_factory.pem --email user_factory@DOMAIN --resource-type user_factory --resource-id xmpp://user_factory@XMPP_DOMAIN --root /root/.omf/trusted_roots/root.pem --duration 50000000 create_resource
 
 Create a certificate for cm_proxy of NTRC (change DOMAIN, XMPP_DOMAIN and if you wish the output file names).
 
-    % omf_cert.rb -o cm_factory.pem --email cm_factory@DOMAIN --resource-type cm_factory --resource-id xmpp://cm_factory@XMPP_DOMAIN --root /root/.omf/trusted_roots/root.pem --duration 50000000 create_resource
+    $ omf_cert.rb -o cm_factory.pem --email cm_factory@DOMAIN --resource-type cm_factory --resource-id xmpp://cm_factory@XMPP_DOMAIN --root /root/.omf/trusted_roots/root.pem --duration 50000000 create_resource
 
 Create a certificate for frisbee_proxy of NTRC (change DOMAIN, XMPP_DOMAIN and if you wish the output file names).
 
-    % omf_cert.rb -o frisbee_factory.pem --email frisbee_factory@DOMAIN --resource-type frisbee_factory --resource-id xmpp://frisbee_factory@XMPP_DOMAIN --root /root/.omf/trusted_roots/root.pem --duration 50000000 create_resource
+    $ omf_cert.rb -o frisbee_factory.pem --email frisbee_factory@DOMAIN --resource-type frisbee_factory --resource-id xmpp://frisbee_factory@XMPP_DOMAIN --root /root/.omf/trusted_roots/root.pem --duration 50000000 create_resource
 
 
+Finally, omf6 script will be used by every user in the server, so we need to create a certificate for each user and place it in folder '~/.omf'. 
 
-Create a certificate for the omf6 script, this certificate is inside the directory '~/.omf', every user of the testbed should have his own certificate in order to use omf6 script (change DOMAIN, USERNAME and if you wish the output file names).
+Important (just for the root user)!!! If you already have a certificate for the root user in folder /root/.omf (probably created while installing omf_sfa) DO NOT create this certificate again and use the old one instead.
 
-Important!!! If you already have a user_cert.pem certificate in folder /root/.omf (probably created while installing omf_sfa) DO NOT create this certificate again and use the old one instead.
+Use this commands to generate a certificate for a user (change DOMAIN, USERNAME and if you wish the output file names) 
 
-    % omf_cert.rb -o user_cert.pem --email USERNAME@DOMAIN --user USERNAME --root ~/.omf/trusted_roots/root.pem --duration 50000000 --geni_uri URI:urn:publicid:IDN+DOMAIN+user+USERNAME create_user
+    $ omf_cert.rb -o user_cert.pem --email USERNAME@DOMAIN --user USERNAME --root /root/.omf/trusted_roots/root.pem --duration 50000000 --geni_uri URI:urn:publicid:IDN+DOMAIN+user+USERNAME create_user
+    $ cp user_cert.pem /home/USERNAME/.omf
 
 Configuration files
 -------------------
@@ -159,16 +161,21 @@ Change configuration file '/etc/nitos_testbed_rc/frisbee_proxy_conf.yaml', which
 
 Important!!! DO NOT modify the file /etc/nitos_testbed_rc/omf_script_conf.yaml. It is a skeleton used by the user_proxy to generate the configuration file for every user it creates.
 
-Finaly, create/modify for each user the configuration file '~/.omf/etc/omf_script_conf.yaml', which is related to omf6 script of NTRC, every user of the testbed should have his own configuration file in order to use omf6 script. For example:
+Finaly, create/modify for each user the configuration file '/home/USERNAME/.omf/etc/omf_script_conf.yaml', which is related to omf6 script of NTRC, every user of the testbed should have his own configuration file in order to use omf6 script. 
+
+    $ mkdir /home/USERNAME/.omf/etc
+    $ cp /etc/nitos_testbed_rc/omf_script_conf.yaml /home/USERNAME/.omf/etc
+
+For example:
 
     :xmpp:
-      :script_user: script_user
+      :script_user: USERNAME
       :password: pw
       :server: DOMAIN
     :auth:
-      :root_cert_dir: ~/.omf/trusted_roots
+      :root_cert_dir: /etc/nitos_testbed_rc/.omf/trusted_roots
       :entity_cert: ~/.omf/user_cert.pem
-      :entity_key: ~/.omf/user_cert.pkey
+      :entity_key: ~/.ssh/id_rsa
     #operation mode for OmfCommon.init (development, production, etc)
     :operationMode: development
     #omf script configuration
@@ -181,9 +188,9 @@ Run proxies
 
 To start/stop/restart the upstart service of nitos_testbed_rc use:
 
-    % start ntrc 
-    % stop ntrc
-    % restart ntrc
+    $ start ntrc 
+    $ stop ntrc
+    $ restart ntrc
 
 Starting ntrc as an upstart will generate the following log files:
 
@@ -195,17 +202,17 @@ Starting ntrc as an upstart will generate the following log files:
 
 Alternatively (mostly for debugging reasons) you can execute all proxies with one command:
 
-    % run_proxies
+    $ run_proxies
 
 Or you run proxies seperatly
 
-    % user_proxy
-    % cm_proxy
-    % frisbee_proxy
+    $ user_proxy
+    $ cm_proxy
+    $ frisbee_proxy
 
 Run omf6 commands
 -----------------
 
 Now you can use omf6 script to execute omf6 related commands
 
-    % omf6 --help
+    $ omf6 --help
