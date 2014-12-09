@@ -15,7 +15,7 @@
 #time (in seconds) before timeout error occurs
 :timeout: 80
 
-#time (in seconds) before timeout error occurs
+#the pxe configuration file in /tftpboot/pxelinux.cfg
 :pxeSymLinkConfFile: omf-5.4
 
 #operation mode for OmfCommon.init (development, production, etc)
@@ -23,3 +23,6 @@
 
 #testbed xmpp topic
 :testbedTopic: am_controller
+
+#testbed domain (resources with other domains will be ignored unless if this has the value 'ALL')
+:testbedDomain: omf:testserver
