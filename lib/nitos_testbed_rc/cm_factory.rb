@@ -28,21 +28,22 @@ module OmfRc::ResourceProxy::CMFactory
       }, :ALL)
       next
     end
-    if value.ignore_msg
-      #just ignore this message, another resource controller should take care of this message
-      next
-    end
-    nod = {}
-    nod[:node_name] = value.node[:name]
-    value.node[:interfaces].each do |i|
-      if i[:role] == "control"
-        nod[:node_ip] = i[:ip][:address]
-        nod[:node_mac] = i[:mac]
-      elsif i[:role] == "cm_network"
-        nod[:node_cm_ip] = i[:ip][:address]
-      end
-    end
-    nod[:node_cm_ip] = value.node[:cmc][:ip][:address]
+    # if value.ignore_msg
+    #   #just ignore this message, another resource controller should take care of this message
+    #   next
+    # end
+    # nod = {}
+    # nod[:node_name] = value.node[:name]
+    # value.node[:interfaces].each do |i|
+    #   if i[:role] == "control"
+    #     nod[:node_ip] = i[:ip][:address]
+    #     nod[:node_mac] = i[:mac]
+    #   elsif i[:role] == "cm_network"
+    #     nod[:node_cm_ip] = i[:ip][:address]
+    #   end
+    # end
+    # nod[:node_cm_ip] = value.node[:cmc][:ip][:address]
+    nod = value.node
 #     nod = {node_name: "node1", node_ip: "10.0.0.1", node_mac: "00-03-1d-0d-4b-96", node_cm_ip: "10.0.0.101"}
 
     case value[:status].to_sym

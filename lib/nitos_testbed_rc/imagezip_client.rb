@@ -38,31 +38,35 @@ module OmfRc::ResourceProxy::ImagezipClient #Imagezip client
         }, :ALL)
         next
       end
-      if client.opts.ignore_msg
-        #just ignore this message, another resource controller should take care of this message
-        next
-      end
+      # if client.opts.ignore_msg
+      #   #just ignore this message, another resource controller should take care of this message
+      #   next
+      # end
 
-      nod = {}
-      nod[:node_name] = client.opts.node.name
-      client.opts.node.interfaces.each do |i|
-        if i[:role] == "control"
-          nod[:node_ip] = i[:ip][:address]
-          nod[:node_mac] = i[:mac]
-        elsif i[:role] == "cm_network"
-          nod[:node_cm_ip] = i[:ip][:address]
-        end
-      end
-      nod[:node_cm_ip] = client.opts.node.cmc.ip.address
+      # nod = {}
+      # nod[:node_name] = client.opts.node.name
+      # client.opts.node.interfaces.each do |i|
+      #   if i[:role] == "control"
+      #     nod[:node_ip] = i[:ip][:address]
+      #     nod[:node_mac] = i[:mac]
+      #   elsif i[:role] == "cm_network"
+      #     nod[:node_cm_ip] = i[:ip][:address]
+      #   end
+      # end
+      # nod[:node_cm_ip] = client.opts.node.cmc.ip.address
 
+      nod = client.opts.node
       client.property.app_id = client.hrn.nil? ? client.uid : client.hrn
 
-      command = "#{client.property.binary_path} -o -z1 #{client.property.hardrive} - | #{@fconf[:imagezipClientNC]} -q 0 #{client.property.ip} #{client.property.port}"
-      debug "Executing command #{command}"
-  #     nod = {node_name: "node1", node_ip: "10.0.0.1", node_mac: "00-03-1d-0d-4b-96", node_cm_ip: "10.0.0.101"}
+      command = "#{client.property.binary_path} -o -z1 -d #{client.property.hardrive} - | #{@fconf[:imagezipClientNC]} -q 0 #{client.property.ip} #{client.property.port}"
+      #     nod = {node_name: "node1", node_ip: "10.0.0.1", node_mac: "00-03-1d-0d-4b-96", node_cm_ip: "10.0.0.101"}
       summary = ''
+      debug "Telnet on: '#{nod[:node_ip]}'"
       host = Net::Telnet.new("Host" => nod[:node_ip], "Timeout" => false)#, "Prompt" => /[\w().-]*[\$#>:.]\s?(?:\(enable\))?\s*$/)
+      debug "Telnet successfull"
+      debug "Executing command #{command.to_s}"
       host.cmd(command.to_s) do |c|
+        print "#{c}"
         # if c.to_s !=  "\n" && c[0,5] != "\n/usr" && c.to_s != "." && c.to_s != ".." && c.to_s != "..."
           # puts '---------(' + c.to_s + ')-----------'
         if c.include? 'compressed'
@@ -76,6 +80,7 @@ module OmfRc::ResourceProxy::ImagezipClient #Imagezip client
           # }, :ALL)
         end
       end
+      debug "imagezip client finished"
 
       client.inform(:status, {
         status_type: 'IMAGEZIP',
