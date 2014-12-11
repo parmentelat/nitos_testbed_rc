@@ -39,7 +39,7 @@ Then you need to run the install_ntrc script to generate the configuration files
 Create certificates
 -------------------
 
-Use omf_cert.rb script to generate the following certificates and place them on directories '/root/.omf' and /root/.omf.
+Use omf_cert.rb script to generate the following certificates and place them on directories '/root/.omf' and '/root/.omf/trusted_roots'.
 
     $ mkdir /root/.omf
     $ mkdir /root/.omf/trusted_roots
