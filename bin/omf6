@@ -4,11 +4,16 @@ require 'time'
 require 'omf_common'
 require 'optparse'
 require 'progress_bar'
+require 'erb'
+require 'socket'
+
 CONF_PATH = '~/.omf/etc/omf_script_conf.yaml'
 FRISB_PATH = '/etc/nitos_testbed_rc/frisbee_proxy_conf.yaml'
 CM_PATH = '/etc/nitos_testbed_rc/cm_proxy_conf.yaml'
 
-@config = YAML.load_file(File.expand_path(CONF_PATH))
+conf_file = File.read(File.expand_path(CONF_PATH))
+conf_file = ERB.new(conf_file, nil).result(binding)
+@config = YAML.load(conf_file)
 # @config = YAML.load_file(File.join(File.dirname(File.expand_path(__FILE__)), '.../etc/omf_script_conf.yaml'))
 @auth = @config[:auth]
 @xmpp = @config[:xmpp]
@@ -501,7 +506,7 @@ def save(comm, options)
                     start_saving()
                     puts "INFO: Starting Imagezip Server on port '#{port}'"
                     create_imagezip_server(comm, fcontroller, port, options)
-                    sleep 2
+                    sleep 1
                     puts "INFO: Starting Imagezip Client on node '#{options[:node]}'"
                     create_imagezip_client(comm, fcontroller, options[:node], port, options)
                     print "INFO: Saving Image for node '#{options[:node]}'..."
