@@ -58,8 +58,7 @@ module OmfRc::ResourceProxy::Frisbee #frisbee client
       client.property.app_id = client.hrn.nil? ? client.uid : client.hrn
 
       command = "#{client.property.binary_path} -i #{client.property.multicast_interface} -m #{client.property.multicast_address} -p #{client.property.port} #{client.property.hardrive}"
-      debug "Executing command #{command}"
-
+      
       output = ''
       host = Net::Telnet.new("Host" => client.property.multicast_interface.to_s, "Timeout" => 200, "Prompt" => /[\w().-]*[\$#>:.]\s?(?:\(enable\))?\s*$/)
       host.cmd(command.to_s) do |c|

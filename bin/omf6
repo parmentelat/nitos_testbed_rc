@@ -102,7 +102,11 @@ def create_frisbee(comm, fcontroller, node, port, options, progress_bar)
               overall = @load_complete.values.inject(:+)
               progress_bar.count = ( overall / @nodes_up_pxe.length) 
               progress_bar.write
-              msg = client_msg.read_property("msg").split("\n")
+              if client_msg.read_property("msg")
+                msg = client_msg.read_property("msg").split("\n")
+              else
+                puts "ERROR: Frisbee client exit with no msg."
+              end
               @load_end_msg += "#{client_msg.read_property("node")}: #{"#{msg[0]} #{msg[1][14..29]}"}\n"
               comm.subscribe('cm_factory') do |controller|
                 controller.on_message do |cm_msg|
@@ -416,8 +420,12 @@ def create_imagezip_client(comm, fcontroller, node, port, options)
             elsif client_msg.read_property("event") == "EXIT"
               stop_saving()
               puts "INFO:"
-              client_msg.read_property("msg").split("\n").each do |line|
-                puts "INFO: #{line}"
+              if client_msg.read_property("msg")
+                client_msg.read_property("msg").split("\n").each do |line|
+                  puts "INFO: #{line}"
+                end 
+              else
+                puts "ERROR: Imagezip stopped with no msg."
               end
               puts "INFO: Image was saved in '#{@frisbee[:imageDir]}/#{@image}'"
               puts "INFO:"
@@ -506,7 +514,6 @@ def save(comm, options)
                     start_saving()
                     puts "INFO: Starting Imagezip Server on port '#{port}'"
                     create_imagezip_server(comm, fcontroller, port, options)
-                    sleep 1
                     puts "INFO: Starting Imagezip Client on node '#{options[:node]}'"
                     create_imagezip_client(comm, fcontroller, options[:node], port, options)
                     print "INFO: Saving Image for node '#{options[:node]}'..."
