@@ -29,7 +29,7 @@
   :defaultImage: baseline.ndz
 
   # max bandwidth for frisbee server
-  :bandwidth: 50000000
+  :bandwidth: 170000000
 
   # Multicast address to use for servicing images
   #mcAddress: 224.0.0.2
@@ -44,7 +44,7 @@
   :frisbeedBin: /usr/sbin/frisbeed
   :frisbeeBin: /usr/sbin/frisbee
   :imagezipClientBin: /usr/bin/imagezip
-  :imagezipClientNC: /bin/nc
+  :imagezipClientNC: /bin/nc -q 0
   :imagezipServerBin: /bin/nc
 
   # Local interface to bind to for frisbee traffic

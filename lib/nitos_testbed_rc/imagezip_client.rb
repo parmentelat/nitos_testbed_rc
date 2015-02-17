@@ -47,8 +47,8 @@ module OmfRc::ResourceProxy::ImagezipClient #Imagezip client
       client.property.multicast_interface = nod[:node_ip]
       client.property.app_id = client.hrn.nil? ? client.uid : client.hrn
 
-      command = "#{client.property.binary_path} -o -z1 #{client.property.hardrive} - | #{@fconf[:imagezipClientNC]} -q 0 #{client.property.ip} #{client.property.port}"
-      debug "Executing command #{command} - host #{client.property.multicast_interface.to_s}"
+      command = "#{client.property.binary_path} -o -z1 #{client.property.hardrive} - | #{@fconf[:imagezipClientNC]} #{client.property.ip} #{client.property.port}"
+      debug "Executing command #{command} on host #{client.property.multicast_interface.to_s}"
       host = Net::Telnet.new("Host" => client.property.multicast_interface.to_s, "Timeout" => false, "Telnetmode" => true)
 
       output = ''
