@@ -41,7 +41,11 @@ module OmfRc::ResourceProxy::Frisbeed
     server.property.image = server.property.image.start_with?('/') ? server.property.image : @fconf[:imageDir] + '/' + server.property.image
     unless File.file?(server.property.image)
       debug "File '#{server.property.image}' does not exist."
-      raise "FILE NOT FOUND."
+      res.inform(:error, {
+        event_type: 'ERROR',
+        exit_code: -1,
+        msg: "File '#{server.property.image}' does not exist."
+      }, :ALL)
     end
     debug "Frisbee server is loading image: #{server.property.image}"
 

@@ -58,6 +58,7 @@ module OmfRc::ResourceProxy::Frisbee #frisbee client
       client.property.app_id = client.hrn.nil? ? client.uid : client.hrn
 
       command = "#{client.property.binary_path} -i #{client.property.multicast_interface} -m #{client.property.multicast_address} -p #{client.property.port} #{client.property.hardrive}"
+      debug "Executing command #{command} on host #{client.property.multicast_interface.to_s}"
       
       output = ''
       host = Net::Telnet.new("Host" => client.property.multicast_interface.to_s, "Timeout" => 200, "Prompt" => /[\w().-]*[\$#>:.]\s?(?:\(enable\))?\s*$/)
@@ -77,6 +78,13 @@ module OmfRc::ResourceProxy::Frisbee #frisbee client
         elsif c[0,6] == "\nWrote"
           c = c.split("\n")
           output = "#{c[1]}\n#{c.last}"
+        elsif c.strip == "Short write!"
+          res.inform(:error,{
+            event_type: "ERROR",
+            exit_code: "-1",
+            node_name: client.property.node_topic,
+            msg: "Load ended with 'Short write' error msg!"
+          }, :ALL)
         end
       end
 
