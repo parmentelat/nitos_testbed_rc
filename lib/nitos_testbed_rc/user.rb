@@ -30,11 +30,22 @@ module OmfRc::ResourceProxy::User
       FileUtils.mkdir_p(path)
     end
 
-    conf_file = File.read('/etc/nitos_testbed_rc/omf_script_conf.yaml')
-    conf_file.sub!(' script_user', " #{res.property.username}")
-    conf_file.sub!(' testserver', " #{res.topics.first.address.split('@').last}")
+    # conf_file = File.read('/etc/nitos_testbed_rc/omf_script_conf.yaml')
+    # conf_file.sub!(' script_user', " #{res.property.username}")
+    # conf_file.sub!(' testserver', " #{res.topics.first.address.split('@').last}")
 
-    File.write("#{path}/omf_script_conf.yaml", conf_file)
+    # File.write("#{path}/omf_script_conf.yaml", conf_file)
+    require 'yaml'
+    opts = begin
+      YAML.load(File.open("/etc/nitos_testbed_rc/omf_script_conf.yaml"))
+    rescue ArgumentError => e
+      debug "Could not parse YAML: #{e.message}"
+    end
+
+    opts[:xmpp][:script_user] = res.property.username
+    opts[:xmpp][:server] = res.topics.first.address.split('@').last
+
+    File.open("#{path}/omf_script_conf.yaml", "w") {|f| f.write(opts.to_yaml) }
 
     cmd = "chown -R #{res.property.username}:#{res.property.username} /home/#{res.property.username}"
     system(cmd)
@@ -42,7 +53,7 @@ module OmfRc::ResourceProxy::User
 
   configure :auth_keys do |res, value|
     path = "/home/#{res.property.username}/.ssh"
-    unless File.directory?(path)#create the directory if it doesn't exist (it will never exist)
+    unless File.directory?(path)#create the directory if it doesn't exist
       FileUtils.mkdir_p(path)
     end
     File.open("#{path}/authorized_keys", 'w') do |file|
