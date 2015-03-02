@@ -168,7 +168,8 @@ module OmfRc::ResourceProxy::User
 
           File.write("#{path}/id_rsa.pub", pub_key.to_pem)
           File.write("#{path}/id_rsa", key.to_pem)
-
+          
+          sleep 1
           res.inform(:status, {
             status_type: 'APP_EVENT',
             event: event_type.to_s.upcase,
@@ -199,6 +200,8 @@ module OmfRc::ResourceProxy::User
             File.write("#{path}/id_rsa.pub", pub_key)
             File.write("#{path}/id_rsa", key.to_pem)
           end
+
+          sleep 1
           res.inform(:status, {
             status_type: 'APP_EVENT',
             event: event_type.to_s.upcase,
