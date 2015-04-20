@@ -63,12 +63,13 @@ def create_frisbeed(comm, fcontroller, port, options)
       server.on_subscribed do
         server.on_message do |m|
           if m.operation == :inform
-            if m.read_content("event") == "STDOUT"
-              puts "INFO: #{m.read_content("msg")}"
-            elsif m.read_content("event") == "EXIT"
-              puts "INFO: #{m.read_content("msg")}"
-            elsif m.read_content("event") == "ERROR"
-              puts "ERROR: #{m.read_content("msg")}"
+            if m.read_content("itype") == "STDOUT"
+              puts "INFO: #{m.read_property("msg")}"
+            elsif m.read_content("itype") == "EXIT"
+              puts "INFO: #{m.read_property("msg")}"
+            elsif m.read_content("itype") == "ERROR"
+              puts "ERROR: #{m.read_property("msg")}"
+              stop_loading(comm)
             end
           end
         end
@@ -124,7 +125,7 @@ def create_frisbee(comm, fcontroller, node, port, options, progress_bar)
                             # fcontroller.release(@@server) do |reply_msg|
                             #   shut_down(comm)
                             # end
-                            stop_loading(comm, fcontroller)
+                            stop_loading(comm)
                           end
                         end
                       end
@@ -135,7 +136,7 @@ def create_frisbee(comm, fcontroller, node, port, options, progress_bar)
                         n = cm_msg.read_property("node_name")
                         @nodes_failed_without_pxe << n
                         if (@nodes_up_without_pxe.length + @nodes_failed_without_pxe.length) == options[:target_nodes].length
-                          stop_loading(comm, fcontroller)
+                          stop_loading(comm)
                         end
                       when "HTTP"
                         puts "ERROR HTTP: #{cm_msg.read_property("msg")}"
