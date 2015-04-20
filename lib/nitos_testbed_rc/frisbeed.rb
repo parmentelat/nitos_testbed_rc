@@ -60,7 +60,7 @@ module OmfRc::ResourceProxy::Frisbeed
 
   hook :before_release do |server|
     begin
-      @app.signal(signal = 'KILL')
+      @app.signal(signal = 'KILL') unless @app.nil?
     rescue Exception => e
       raise e unless e.message == "No such process"
     ensure
