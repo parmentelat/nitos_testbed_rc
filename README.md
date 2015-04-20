@@ -36,9 +36,9 @@ Then you need to run the install_ntrc script to generate the configuration files
 
     $ install_ntrc
 
-Hint: If you have an installed nitos_testbed_rc gem and want to keep the configuration files, execute install_ntrc script with --no_conf flag.
+Hint: If you have an installed nitos_testbed_rc gem and want to keep the configuration files, execute install_ntrc script with -nc flag.
 
-    $ install_ntrc --no_conf
+    $ install_ntrc -nc
 
 Create certificates
 -------------------
