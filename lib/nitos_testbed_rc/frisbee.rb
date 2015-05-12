@@ -10,12 +10,9 @@ require 'timeout'
 # so we reconstruct lines and parse them one line at a time
 class FrisbeeParser
 
-  # do not pass res, use the global instead 
-#  def initialize(client, res)
   def initialize(client)
     # keep a reference to the messaging entities that we notify of our progress or errors
     @client = client
-#    @res = res
     # overall result
     @output = nil
     ### local stuff
@@ -73,12 +70,12 @@ class FrisbeeParser
       end
     # this happens when the whole thing goes south
     elsif @line =~ /.*Short write.*/
-      res.inform(:error,{
-                   event_type: "ERROR",
-                   exit_code: "-1",
-                   node_name: @client.property.node_topic,
-                   msg: "Load ended with 'Short write' error msg!"
-                 }, :ALL)
+      @client.inform(:error,{
+                       event_type: "ERROR",
+                       exit_code: "-1",
+                       node_name: @client.property.node_topic,
+                       msg: "Load ended with 'Short write' error msg!"
+                     }, :ALL)
     end
   end
 
@@ -127,7 +124,7 @@ module OmfRc::ResourceProxy::Frisbee #frisbee client
     Thread.new do
       debug "Received message '#{client.opts.inspect}'"
       if error_msg = client.opts.error_msg
-        res.inform(:error,{
+        client.inform(:error,{
           event_type: "AUTH",
           exit_code: "-1",
           node_name: client.property.node_topic,
@@ -162,7 +159,6 @@ module OmfRc::ResourceProxy::Frisbee #frisbee client
                              "Timeout" => 200,
 #                             "Output_log" => "/tmp/telnet.log",
                             )
-      # I have no idea where this 'res' thing comes from
       parser = FrisbeeParser.new(client)
 
       host.cmd(command.to_s) do |chunk|
