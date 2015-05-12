@@ -5,6 +5,102 @@ require 'net/telnet'
 require 'socket'
 require 'timeout'
 
+####################
+# the output of the frisbee client has no reason to come line by line
+# so we reconstruct lines and parse them one line at a time
+class FrisbeeParser
+
+  # do not pass res, use the global instead 
+#  def initialize(client, res)
+  def initialize(client)
+    # keep a reference to the messaging entities that we notify of our progress or errors
+    @client = client
+#    @res = res
+    # overall result
+    @output = nil
+    ### local stuff
+    # initialize current line
+    @line = ""
+    # total number of chunks
+    @total_chunks = nil
+  end
+
+  def get_output
+    @output
+  end
+
+  # parse one line of output from the frisbee client
+  # support for old-style (2002) and new-style (2006) clients
+  def parse_line
+    # old-style frisbee plain percentage report
+    if m = /^Progress:\s+([\d.]+%).*/.match(@line)
+      percent = m[1]
+      @client.inform(:status, {
+                       status_type: 'FRISBEE',
+                       event: "STDOUT",
+                       app: @client.property.app_id,
+                       node: @client.property.node_topic,
+                       msg: "#{percent.to_s}"
+                     }, :ALL)
+    # final report on size
+    elsif m = /^Wrote\s+(\d+)\s+byte.*/.match(@line)
+      # xxx this is for reproducing the old behaviour
+      # but it looks wrong as it repeats the entire line
+      content = @line.split("\n")
+      # should probably rather use this instead
+      bytes = m[1]
+      @output = "#{content.first}\n#{content.last}"
+    # new-style output first reports total number of chunks
+    elsif m = /.*File is ([0-9]+) chunks.*/.match(@line)
+      # record this as an integer
+      @total_chunks = m[1].to_i
+    # and then a status line every now and again
+    # we've always seen exactly 67 chars in a status line but well
+    elsif m = /[.sz]{60,75}\s+\d+\s+(\d+)/.match(@line)
+      if @total_chunks
+        remaining_chunks = m[1].to_i
+        i_percent = 100 * (@total_chunks - remaining_chunks) / @total_chunks
+        percent = "#{i_percent}%"
+        @client.inform(:status, {
+                         status_type: 'FRISBEE',
+                         event: "STDOUT",
+                         app: @client.property.app_id,
+                         node: @client.property.node_topic,
+                         msg: "#{percent.to_s}"
+                       }, :ALL)
+        # else, this means we have not properly read the line that gives
+        # the number of chunks, and there's nothing we can do..
+      end
+    # this happens when the whole thing goes south
+    elsif @line =~ /.*Short write.*/
+      res.inform(:error,{
+                   event_type: "ERROR",
+                   exit_code: "-1",
+                   node_name: @client.property.node_topic,
+                   msg: "Load ended with 'Short write' error msg!"
+                 }, :ALL)
+    end
+  end
+
+  def new_input(chunk)
+    chunk.each_char do |c|
+      if c == "\n"
+        parse_line()
+        @line = ""
+      else
+        @line << c
+      end
+    end
+  end
+  
+  def close
+    if @line
+      parse_line()
+    end
+  end
+    
+end
+
 module OmfRc::ResourceProxy::Frisbee #frisbee client
   include OmfRc::ResourceProxyDSL
   require 'omf_common/exec_app'
@@ -60,33 +156,20 @@ module OmfRc::ResourceProxy::Frisbee #frisbee client
       command = "#{client.property.binary_path} -i #{client.property.multicast_interface} -m #{client.property.multicast_address} -p #{client.property.port} #{client.property.hardrive}"
       debug "Executing command #{command} on host #{client.property.multicast_interface.to_s}"
       
-      output = ''
-      host = Net::Telnet.new("Host" => client.property.multicast_interface.to_s, "Timeout" => 200, "Prompt" => /[\w().-]*[\$#>:.]\s?(?:\(enable\))?\s*$/)
-      host.cmd(command.to_s) do |c|
-        if c[0,8] ==  "Progress"
-          c = c.split[1]
-          client.inform(:status, {
-            status_type: 'FRISBEE',
-            event: "STDOUT",
-            app: client.property.app_id,
-            node: client.property.node_topic,
-            msg: "#{c.to_s}"
-          }, :ALL)
-        elsif c[0,5] == "Wrote"
-          c = c.split("\n")
-          output = "#{c.first}\n#{c.last}"
-        elsif c[0,6] == "\nWrote"
-          c = c.split("\n")
-          output = "#{c[1]}\n#{c.last}"
-        elsif c.strip == "Short write!"
-          res.inform(:error,{
-            event_type: "ERROR",
-            exit_code: "-1",
-            node_name: client.property.node_topic,
-            msg: "Load ended with 'Short write' error msg!"
-          }, :ALL)
-        end
+      # previous Prompt was way too extensive and caused early exits from cmd
+      # of course using ssh would be much nicer, but for now let's keep it simple
+      host = Net::Telnet.new("Host" => client.property.multicast_interface.to_s,
+                             "Timeout" => 200,
+#                             "Output_log" => "/tmp/telnet.log",
+                            )
+      # I have no idea where this 'res' thing comes from
+      parser = FrisbeeParser.new(client)
+
+      host.cmd(command.to_s) do |chunk|
+        parser.new_input(chunk)
       end
+      parser.close()
+      output = parser.get_output()
 
       client.inform(:status, {
         status_type: 'FRISBEE',
