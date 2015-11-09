@@ -157,7 +157,9 @@ module OmfRc::ResourceProxy::Frisbee #frisbee client
       # of course using ssh would be much nicer, but for now let's keep it simple
       host = Net::Telnet.new("Host" => client.property.multicast_interface.to_s,
                              "Timeout" => 200,
-#                             "Output_log" => "/tmp/telnet.log",
+                             # this log will hold a transcript of the frisbee client output
+                             # locate it together with the other logs belonging with nitos_testbed_rc
+                             "Output_log" => "/var/log/upstart/ntrc_frisbee_telnet.log",
                             )
       parser = FrisbeeParser.new(client)
 
