@@ -95,7 +95,7 @@ module OmfRc::ResourceProxy::Frisbeed
     end
   end
 
- # Build the command line, which will be used to add a new user.
+  # Build the command line, which will be used to run the frisbee server
   #
   work('build_command_line') do |res|
     cmd_line = "env -i " # Start with a 'clean' environment
@@ -104,7 +104,10 @@ module OmfRc::ResourceProxy::Frisbeed
     cmd_line += "-m " + res.property.multicast_address + " "   # -m for address
     cmd_line += "-p " + res.property.port.to_s  + " "           # -p for port
     cmd_line += "-W " + res.property.speed.to_s + " "           # -W for bandwidth
+    cmd_line += "-K 3 "
+#    cmd_line += "-d -d "
     cmd_line += res.property.image                              # image no arguement
+    debug "frisbeed command line = '#{cmd_line}'"
     cmd_line
   end
 end
